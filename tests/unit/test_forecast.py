@@ -189,6 +189,14 @@ class ForecastTests(unittest.TestCase):
         self.s.reorder_forecast(today=date(2026, 10, 12))
         self.assertEqual(self.s.db.execute('SELECT count(*) FROM reorder_forecasts').fetchone()[0], 2)
 
+    def test_scheduled_run_builds_its_own_date(self):
+        sunday = self.s.reorder_forecast(today=date(2026, 10, 4), exact_date=True)
+        monday = self.s.reorder_forecast(today=TODAY, exact_date=True)
+        self.assertEqual((sunday['run_date'], monday['run_date']), ('2026-10-04', '2026-10-05'))
+        self.api.gets.clear()
+        self.assertEqual(self.s.reorder_forecast(today=TODAY, exact_date=True), monday)
+        self.assertEqual(self.api.gets, [])
+
     def test_cycle_settings(self):
         with self.assertRaises(ValueError):
             self.s.set_order_cycle('0820000001', 0)

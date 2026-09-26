@@ -99,7 +99,7 @@ keeps any cycle you set, and setting a cycle includes them again.
 **Running it**
 
 ```sh
-.venv/bin/hustleai-forecast run --print             # build or reuse this week's report
+.venv/bin/hustleai-forecast run --print             # build today's report, or reuse today's
 .venv/bin/hustleai-forecast run --refresh --print   # rebuild from Zoho now
 ```
 

@@ -1,7 +1,7 @@
 """Build the weekly reorder forecast or manage per-customer reorder cycles.
 
 Examples:
-  hustleai-forecast run                 Build or reuse this week's report
+  hustleai-forecast run                 Build today's report, or reuse today's saved one
   hustleai-forecast run --refresh       Rebuild from Zoho now
   hustleai-forecast run --date 2026-10-05
   hustleai-forecast cycles list
@@ -52,7 +52,7 @@ def main(argv=None):
 
     with Service() as service:
         if args.command == 'run':
-            report = service.reorder_forecast(args.refresh, args.date)
+            report = service.reorder_forecast(args.refresh, args.date, exact_date=True)
             path = write_report(report)
             print(f"{len(report['due'])} customer(s) expected {report['window_start']} to before {report['window_end']}; "
                   f"{len(report['overdue'])} overdue. Report: {path}")

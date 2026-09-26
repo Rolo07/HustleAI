@@ -206,19 +206,26 @@ def render_markdown(report):
 class ForecastWorkflows:
     """Mixin using Service's API, storage, config and client lookup."""
 
-    def reorder_forecast(self, refresh=False, today=None):
+    def reorder_forecast(self, refresh=False, today=None, exact_date=False):
         """Return this week's saved forecast, or build and save a new one.
 
         Args:
             refresh: Rebuild from Zoho even when a recent report exists.
             today: Run date; defaults to today in Africa/Johannesburg.
+            exact_date: Reuse only a report saved for this exact run date. The
+                scheduled job uses this so each Monday gets its own report;
+                on-demand requests reuse any report from the last seven days.
         Returns:
             Report dictionary; see build_forecast.
         Raises:
             ValueError: Zoho reads fail or the GET budget is reached.
         """
         today = today or local_today()
-        if not refresh:
+        if not refresh and exact_date:
+            saved = self.store.forecast(today)
+            if saved:
+                return saved
+        elif not refresh:
             latest = self.store.forecast()
             if latest and 0 <= (today - date.fromisoformat(latest['run_date'])).days < REUSE_DAYS:
                 return latest

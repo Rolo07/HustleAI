@@ -45,7 +45,7 @@ last week's report.
 ## Commands
 
 ```sh
-.venv/bin/hustleai-forecast run                    # build, or reuse this week's report
+.venv/bin/hustleai-forecast run                    # build today's report, or reuse today's
 .venv/bin/hustleai-forecast run --refresh --print  # rebuild now and print it
 .venv/bin/hustleai-forecast cycles list
 .venv/bin/hustleai-forecast cycles set 0821234567 21
