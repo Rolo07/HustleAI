@@ -25,6 +25,19 @@ changes invoices.
 6. A customer with only one order goes under "Unable to predict" until Roland
    sets a cycle for them.
 
+**Tracking start date.** Only orders on or after `forecast_start_date` in
+`.zoho-local.json` count. Set it when the app goes live on the VPS, because older
+Zoho history is incomplete and would fill the report with long-lapsed customers.
+Until it is set, all history counts. In the first weeks after go-live most
+customers will show under "Unable to predict" until they have ordered twice.
+Setting cycles for regular customers fills the report sooner.
+
+```sh
+.venv/bin/hustleai-forecast start-date today        # set at go-live
+.venv/bin/hustleai-forecast start-date              # show it
+.venv/bin/hustleai-forecast start-date --clear      # count all history again
+```
+
 "Today" is always the date in `Africa/Johannesburg`, so a server running in UTC
 still uses the right day.
 
@@ -91,6 +104,8 @@ appears in source control. Apply it with the upgrade command:
 ## Schedule
 
 Use exactly one of these:
+
+Set the tracking start date before enabling either schedule.
 
 - **VPS:** `deploy/schedule/hustleai-forecast.service` and `.timer`. The timer
   runs Mondays at 07:00 `Africa/Johannesburg` regardless of the server

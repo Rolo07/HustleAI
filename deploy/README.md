@@ -32,6 +32,12 @@ stop the Mac workflow processes before enabling the VPS instance. Historical
 reviews were invalidated at cutover; generate fresh previews after deployment.
 Database migrations never send Zoho invoices or WhatsApp messages.
 
+**Weekly forecast go-live.** On the day the VPS starts serving, run
+`hustleai-forecast start-date today` so the reorder forecast only learns from
+orders placed from then on. Then enable `deploy/schedule/hustleai-forecast.timer`
+(see [the forecast guide](../docs/guides/REORDER_FORECAST.md)). Do not also run
+the Mac schedule.
+
 Follow the [storage and recovery guide](../supabase/README.md). Configure separate
 encrypted off-device backups for runtime secrets, the price-list PDF and other
 required files; hosted PostgreSQL does not store those files. Scheduled backup

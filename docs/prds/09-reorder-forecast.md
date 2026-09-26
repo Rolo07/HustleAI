@@ -37,7 +37,10 @@ he can order stock from suppliers and plan delivery routes before orders arrive.
    gaps differ by more than half the average.
 6. **Not enough history.** A customer with one order and no cycle is listed
    under "Unable to predict" and never guessed.
-7. **Hidden test orders.** For customers who make the list, the full invoices
+7. **Tracking start.** Only orders on or after `forecast_start_date` count. It
+   is set when the app goes live on the VPS, because older Zoho history is
+   incomplete. Until it is set, all history counts.
+8. **Hidden test orders.** For customers who make the list, the full invoices
    are rechecked. A test order found in the line items is dropped and the
    prediction is redone.
 
@@ -101,6 +104,7 @@ These are covered by `tests/unit/test_forecast.py` and the opt-in PostgreSQL sui
   marker that appears only in line items.
 - Product totals, area grouping and value totals match the used orders.
 - Rerunning on the same date keeps one saved report.
+- Orders before the tracking start date are ignored; an invalid date stops the run.
 - Forecast settings and reports of one organization are invisible to another.
 
 ## Dependencies and open questions
@@ -113,3 +117,4 @@ These are covered by `tests/unit/test_forecast.py` and the opt-in PostgreSQL sui
 | Long-lapsed customers | Stay in the overdue list until Roland excludes them. An automatic cut-off could be added later. |
 | Seasonal or irregular customers | Handled by owner-set cycles; no seasonal model. |
 | Only-selected-customers mode | Not built. The current design includes everyone with history. |
+| Tracking start date | Decided 2026-09-27: count orders only from VPS go-live. Set with `hustleai-forecast start-date today` at deployment. |

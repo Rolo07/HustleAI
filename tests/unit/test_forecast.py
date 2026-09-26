@@ -197,6 +197,38 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual(self.s.reorder_forecast(today=TODAY, exact_date=True), monday)
         self.assertEqual(self.api.gets, [])
 
+    def test_start_date_ignores_older_orders(self):
+        self.s.workflow_config['forecast_start_date'] = '2026-09-10'
+        report = self.s.build_forecast(TODAY)
+        self.assertEqual(report['tracking_since'], '2026-09-10')
+        # Alpha keeps only 09-14 and 09-28: one 14-day gap, so low confidence.
+        alpha = next(c for c in report['due'] if c['customer_name'] == 'Alpha Store')
+        self.assertEqual((alpha['cycle_days'], alpha['confidence'], alpha['expected_value']), (14, 'low', '120.00'))
+        self.assertEqual(report['overdue'], [])  # Bravo's August orders are before tracking
+        names = [c['customer_name'] for c in report['unpredictable']]
+        self.assertEqual(names, [])  # Charlie's only order is before tracking
+        self.assertIn('Only orders from 2026-09-10 onward', render_markdown(report))
+
+    def test_invalid_start_date(self):
+        self.s.workflow_config['forecast_start_date'] = 'next week'
+        with self.assertRaisesRegex(ValueError, 'YYYY-MM-DD'):
+            self.s.build_forecast(TODAY)
+
+    def test_start_date_command_preserves_settings(self):
+        from hustleai.cli import forecast as cli
+        config = self.root / 'local.json'
+        config.write_text(json.dumps({'organization_id': '123', 'vat_registered': False}))
+        with patch.object(cli, 'CONFIG', config):
+            self.assertIn('all order history', cli.start_date(None))
+            cli.start_date('2026-10-15')
+            self.assertEqual(json.loads(config.read_text()),
+                             {'organization_id': '123', 'vat_registered': False, 'forecast_start_date': '2026-10-15'})
+            self.assertIn('2026-10-15', cli.start_date(None))
+            cli.start_date(None, clear=True)
+            self.assertNotIn('forecast_start_date', json.loads(config.read_text()))
+            with self.assertRaises(ValueError):
+                cli.start_date('15/10/2026')
+
     def test_cycle_settings(self):
         with self.assertRaises(ValueError):
             self.s.set_order_cycle('0820000001', 0)

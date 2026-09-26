@@ -59,6 +59,21 @@ def predict(order_dates, override_days=None):
             'basis': 'history', 'confidence': 'low' if low else 'normal', 'dates_used': dates}
 
 
+def tracking_start(config):
+    """Return the configured first date of tracked orders, or None for all history.
+
+    forecast_start_date (YYYY-MM-DD) is set when the app goes live on the VPS,
+    so older, patchy invoice history never drives predictions.
+    """
+    value = config.get('forecast_start_date')
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError:
+        raise ValueError('forecast_start_date must be YYYY-MM-DD; fix it with hustleai-forecast start-date.') from None
+
+
 def classify(prediction, today):
     """Return 'due' for the 7-14 day window, 'overdue' if past, else None."""
     start = today + timedelta(days=LEAD_DAYS)
@@ -154,7 +169,9 @@ def render_markdown(report):
     last_day = date.fromisoformat(report['window_end']) - timedelta(days=1)
     lines = [f"# Reorder forecast: {report['window_start']} to {last_day.isoformat()}", '',
              f"Run on {report['run_date']} ({report['timezone']}). Predictions use each customer's "
-             f"last {HISTORY_ORDERS} orders unless you set a cycle for them.", '']
+             f"last {HISTORY_ORDERS} orders unless you set a cycle for them.",
+             (f"Only orders from {report['tracking_since']} onward are counted." if report.get('tracking_since')
+              else 'All order history is counted; no tracking start date is set.'), '']
     due = report['due']
     lines += [f'## Expected to order ({len(due)})', '']
     if due:
@@ -240,10 +257,12 @@ class ForecastWorkflows:
         """
         today = today or local_today()
         excluded_ids = set(map(str, self.workflow_config.get('test_invoice_ids', [])))
+        tracking = tracking_start(self.workflow_config)
         settings = self.store.order_cycles()
         by_customer = defaultdict(list)
         for summary in self.api.pages('invoices', 'invoices'):
-            if eligible_order(summary, excluded_ids) and date.fromisoformat(summary['date']) <= today:
+            day = date.fromisoformat(summary['date'])
+            if eligible_order(summary, excluded_ids) and day <= today and (tracking is None or day >= tracking):
                 by_customer[str(summary['customer_id'])].append(summary)
         due, overdue, unpredictable = [], [], []
         excluded_customers = 0
@@ -286,7 +305,8 @@ class ForecastWorkflows:
         start = today + timedelta(days=LEAD_DAYS)
         end = start + timedelta(days=WINDOW_DAYS)
         report = {'run_date': today.isoformat(), 'window_start': start.isoformat(), 'window_end': end.isoformat(),
-                  'timezone': str(TIMEZONE), 'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+                  'timezone': str(TIMEZONE), 'tracking_since': tracking.isoformat() if tracking else None,
+                  'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
                   'due': due, 'products': total_products(due), 'areas': group_by_area(due),
                   'overdue': overdue, 'unpredictable': unpredictable,
                   'expected_value_total': money(sum((Decimal(c['expected_value']) for c in due), Decimal(0))),
@@ -307,6 +327,7 @@ class ForecastWorkflows:
         while pool:
             prediction = predict([date.fromisoformat(s['date']) for s in pool], override_days)
             if prediction is None:
+                # One tracked order so far: listed so Roland can set a cycle.
                 return 'unpredictable', max(date.fromisoformat(s['date']) for s in pool), []
             status = classify(prediction, today)
             if status is None:

@@ -79,6 +79,12 @@ customers. See the [flow and PRD](docs/prds/09-reorder-forecast.md) and the
 4. A cycle you set for a customer replaces the history average.
 5. Confidence is low with only two orders, or when the gaps are uneven.
 6. A customer with one order is listed under "Unable to predict" until you set a cycle.
+7. Only orders from the **tracking start date** onward count. Set it on the day
+   the app goes live on the VPS, so older, patchy invoice history is ignored:
+
+   ```sh
+   .venv/bin/hustleai-forecast start-date today
+   ```
 
 **Choosing which customers appear**
 
