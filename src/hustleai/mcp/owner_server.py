@@ -1,8 +1,25 @@
 """Local stdio MCP server for Hermes. No public HTTP port required."""
 from mcp.server.fastmcp import FastMCP
 from hustleai.workflows.service import Service
+from hustleai.integrations.whatsapp import config as whatsapp_config
 
-mcp = FastMCP('zoho_invoice', instructions='Show every write preview to Roland. Call confirm_operation only after Roland explicitly replies CONFIRM followed by that operation ID. Never invent confirmation. PDFs are for Roland only; never send to customers.')
+mcp = FastMCP('zoho_invoice', instructions='Show every write preview to Roland. When the WhatsApp gateway is set up, Roland confirms by sending CONFIRM or APPROVE with the ID to the business number himself; the gateway executes it and confirm_operation/approve_invoice_version refuse. Otherwise call confirm_operation only after Roland explicitly replies CONFIRM followed by that operation ID. Never invent confirmation. PDFs are for Roland only; use send_pdf_to_owner, never send to customers.')
+
+
+def gateway_confirms():
+    """True when the WhatsApp gateway is configured to own confirmations.
+
+    Then only Roland's own CONFIRM or APPROVE message, verified by Meta's
+    signature and his number, can execute; the model cannot relay one.
+    """
+    try:
+        return whatsapp_config.load()['confirmations_only']
+    except ValueError:
+        return False
+
+
+GATEWAY_ONLY = ('Ask Roland to send "{word} {id}" to the business WhatsApp number himself. '
+                'The gateway verifies his number and carries it out; this tool cannot.')
 
 
 @mcp.tool()
@@ -215,6 +232,8 @@ def confirm_operation(operation_id: str, user_confirmation: str) -> dict:
     another proposal. The gateway must authenticate Roland: possession of a
     confirmation string is not independent proof of consent.
     """
+    if gateway_confirms():
+        raise ValueError(GATEWAY_ONLY.format(word='CONFIRM', id=operation_id))
     with Service() as s:
         return s.confirm(operation_id, user_confirmation)
 
@@ -300,6 +319,8 @@ def approve_invoice_version(review_id: str, owner_confirmation: str) -> dict:
     reorder confirmation is not an owner delivery approval. The gateway must
     authenticate Roland separately from this text check.
     """
+    if gateway_confirms():
+        raise ValueError(GATEWAY_ONLY.format(word='APPROVE', id=review_id))
     s = Service()
     try:
         return s.approve_invoice(review_id, owner_confirmation)
@@ -380,6 +401,36 @@ def exclude_from_forecast(cellphone: str, exclude: bool = True, contact_id: str 
     """
     with Service() as s:
         return s.exclude_from_forecast(cellphone, exclude, contact_id)
+
+
+@mcp.tool()
+def send_pdf_to_owner(pdf_path: str, caption: str = '') -> dict:
+    """Send an invoice PDF to Roland's WhatsApp, never to anyone else.
+
+    Args:
+        pdf_path: A path returned by invoice_pdf or review_invoice.
+        caption: Optional short note shown with the file.
+    Returns: Outbox status (sent, or held until Roland next writes).
+    Raises: ValueError if WhatsApp is not configured or the path is outside
+        the invoice PDF folder.
+
+    The recipient is always the configured owner number. Sending the same file
+    again does not create a second message.
+    """
+    import hashlib
+    from pathlib import Path
+    from hustleai.integrations.whatsapp.client import WhatsAppClient
+    from hustleai.workflows.outbox import Outbox
+    settings = whatsapp_config.load()
+    with Service() as s:
+        path = Path(pdf_path).resolve()
+        if s.pdf_dir.resolve() not in path.parents or path.suffix.lower() != '.pdf' or not path.is_file():
+            raise ValueError('Only PDFs inside the invoice PDF folder can be sent.')
+        key = 'owner-pdf:' + hashlib.sha256(path.read_bytes()).hexdigest()
+        row = Outbox(s.store, WhatsAppClient(settings), settings).send(
+            'owner_pdf', key, settings['owner_number'],
+            {'type': 'document', 'path': str(path), 'filename': path.name, 'caption': caption})
+    return {'status': row['status'], 'error': row.get('error'), 'recipient': 'Roland'}
 
 
 def main():

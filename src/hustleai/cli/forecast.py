@@ -55,6 +55,23 @@ def start_date(value, clear=False):
     return f"Tracking orders since {config['forecast_start_date']}. Older invoices are ignored."
 
 
+def send_to_owner(service, report):
+    """Send the report to the owner's WhatsApp once per run date."""
+    from hustleai.integrations.whatsapp import config as wa_config
+    from hustleai.integrations.whatsapp.client import WhatsAppClient
+    from hustleai.workflows.forecast import render_whatsapp
+    from hustleai.workflows.outbox import Outbox
+    if not wa_config.configured(ROOT):
+        return 'WhatsApp is not set up yet; the report was saved but not sent.'
+    settings = wa_config.load(ROOT)
+    rows = Outbox(service.store, WhatsAppClient(settings), settings).send_text(
+        'forecast', f"forecast:{report['run_date']}", settings['owner_number'], render_whatsapp(report))
+    statuses = {row['status'] for row in rows}
+    if statuses == {'waiting_window'}:
+        return 'WhatsApp: held until the owner next messages the business number (24-hour rule).'
+    return 'WhatsApp: ' + ', '.join(sorted(statuses))
+
+
 def main(argv=None):
     """Dispatch the run or cycles command and print a short result."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -63,6 +80,7 @@ def main(argv=None):
     run_parser.add_argument('--date', type=date.fromisoformat, help='Run date YYYY-MM-DD; default is today in South Africa')
     run_parser.add_argument('--refresh', action='store_true', help='Rebuild even if a report exists for this week')
     run_parser.add_argument('--print', action='store_true', help='Also print the report')
+    run_parser.add_argument('--send', action='store_true', help="Also send it to the owner's WhatsApp")
     start = sub.add_parser('start-date', help='Show or set the first date of tracked orders')
     start.add_argument('value', nargs='?', help="YYYY-MM-DD or 'today'; omit to show the current date")
     start.add_argument('--clear', action='store_true', help='Count all order history again')
@@ -88,6 +106,8 @@ def main(argv=None):
                   f"{len(report['overdue'])} overdue. Report: {path}")
             if args.print:
                 print(render_markdown(report))
+            if args.send:
+                print(send_to_owner(service, report))
         elif args.action == 'list':
             settings = service.store.order_cycles()
             if not settings:

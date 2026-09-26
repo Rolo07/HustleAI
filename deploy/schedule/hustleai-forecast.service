@@ -9,4 +9,4 @@ After=network-online.target
 Type=oneshot
 User=hermes
 Environment=HUSTLEAI_DATA_DIR=/var/lib/hustleai
-ExecStart=/opt/hustleai/.venv/bin/hustleai-forecast run
+ExecStart=/opt/hustleai/.venv/bin/hustleai-forecast run --send

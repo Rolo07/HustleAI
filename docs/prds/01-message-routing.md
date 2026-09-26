@@ -4,7 +4,9 @@
 
 ![PRD 01 — Message routing and access workflow](../diagrams/01-message-routing.svg)
 
-Status: specified; not implemented. See [shared decisions](README.md).
+Status: gateway built: verification, deduplication, owner routing and referrals.
+Customer intents are pending. See the [gateway guide](../guides/WHATSAPP_GATEWAY.md)
+and [shared decisions](README.md).
 
 ## Goal and actors
 

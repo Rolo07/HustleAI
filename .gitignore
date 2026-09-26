@@ -33,3 +33,6 @@ reports/
 
 # Local Claude Code settings and permissions
 .claude/
+
+# WhatsApp Cloud API settings and secrets
+.whatsapp.json

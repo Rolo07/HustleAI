@@ -12,6 +12,7 @@
     <array>
         <string>/Users/rolandachary/Desktop/HustleAI/.venv/bin/hustleai-forecast</string>
         <string>run</string>
+        <string>--send</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>

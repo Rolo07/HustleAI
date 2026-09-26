@@ -1,0 +1,16 @@
+# VPS: always-on WhatsApp gateway (not scheduled; restarts on failure).
+# Copy to /etc/systemd/system/, then: sudo systemctl enable --now hustleai-gateway
+[Unit]
+Description=HustleAI WhatsApp gateway
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=hermes
+Environment=HUSTLEAI_DATA_DIR=/var/lib/hustleai
+ExecStart=/opt/hustleai/.venv/bin/hustleai-whatsapp serve
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

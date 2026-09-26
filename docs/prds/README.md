@@ -107,7 +107,8 @@ See [the implementation guide](../guides/ZOHO_WORKFLOW_TOOLS.md) for methods and
 These extensions passed local tests and an authorized live draft-update and
 version-approval test with invoice UPDATE permission. They do not implement the complete customer workflows in these PRDs.
 
-Customer gateway routing, name collection, customer-scoped draft authorization,
+The WhatsApp gateway now verifies webhooks, deduplicates events, routes the
+owner number to gateway-run commands and refers every customer message. Name collection, customer-scoped draft authorization,
 WhatsApp delivery and receipt tracking, sent-state updates, immediate referrals
 and scheduled summaries remain pending. The current MCP is owner-side only.
 

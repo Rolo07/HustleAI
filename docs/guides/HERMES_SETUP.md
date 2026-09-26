@@ -125,5 +125,5 @@ References:
 Five additional owner-side tools support reorder retrieval, draft updates and
 version-specific approval. See [the workflow tools guide](ZOHO_WORKFLOW_TOOLS.md)
 for exact schemas, permissions and limits. Install the entire `src/hustleai` package; individual root wrappers alone
-are not a deployable application. The MCP server now exposes 17 tools. Customer gateway and
+are not a deployable application. The MCP server now exposes 18 tools. Customer gateway and
 WhatsApp delivery remain separate, pending integrations.

@@ -32,6 +32,11 @@ stop the Mac workflow processes before enabling the VPS instance. Historical
 reviews were invalidated at cutover; generate fresh previews after deployment.
 Database migrations never send Zoho invoices or WhatsApp messages.
 
+**WhatsApp gateway.** Follow [the gateway guide](../docs/guides/WHATSAPP_GATEWAY.md):
+run `hustleai-whatsapp setup`, put HTTPS in front with `Caddyfile.example`, and
+enable `deploy/schedule/hustleai-gateway.service`. All schedules and times are
+in [SCHEDULED_TASKS.md](../SCHEDULED_TASKS.md).
+
 **Weekly forecast go-live.** On the day the VPS starts serving, run
 `hustleai-forecast start-date today` so the reorder forecast only learns from
 orders placed from then on. Then enable `deploy/schedule/hustleai-orders-sync.timer` (nightly 22:00) and

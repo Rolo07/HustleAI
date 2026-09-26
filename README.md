@@ -49,9 +49,18 @@ python3 zoho_clients.py lookup
 python3 zoho_clients.py sync
 ```
 
-The owner MCP exposes 17 tools, including a weekly
+The owner MCP exposes 18 tools, including a weekly
 [reorder forecast](docs/guides/REORDER_FORECAST.md) for stock and delivery planning. Customer gateway authorization and WhatsApp
 sending are not implemented yet. See [workflow tools](docs/guides/ZOHO_WORKFLOW_TOOLS.md).
+
+## WhatsApp gateway
+
+The gateway receives messages to the business WhatsApp number (Meta Cloud API).
+Only Roland's number, verified from Meta's signed webhook, can run `CONFIRM`,
+`APPROVE` and `FORECAST`. Customer messages are referred to Roland. The
+business number is a setting: run `hustleai-whatsapp setup` when it arrives.
+See the [gateway guide](docs/guides/WHATSAPP_GATEWAY.md) and every run time in
+[SCHEDULED_TASKS.md](SCHEDULED_TASKS.md).
 
 ## Tax
 

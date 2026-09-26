@@ -44,6 +44,19 @@ class SQLiteRepository(WorkflowRepository):
             last_modified_time TEXT, notes TEXT, line_items TEXT,
             details_synced INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0,
             source TEXT NOT NULL, updated_at TEXT, PRIMARY KEY (org, invoice_id))''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS webhook_events (
+            org TEXT NOT NULL, provider_event_id TEXT NOT NULL, event_type TEXT NOT NULL,
+            payload TEXT NOT NULL, received_at REAL, processed_at REAL,
+            PRIMARY KEY (org, provider_event_id))''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS delivery_attempts (
+            id TEXT PRIMARY KEY, org TEXT NOT NULL, purpose TEXT NOT NULL,
+            idempotency_key TEXT NOT NULL, approval_id TEXT, recipient TEXT NOT NULL,
+            provider_message_id TEXT, status TEXT NOT NULL, message TEXT, error TEXT,
+            attempts INTEGER NOT NULL DEFAULT 0, created_at REAL, updated_at REAL,
+            UNIQUE (org, idempotency_key), UNIQUE (org, provider_message_id))''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS conversation_windows (
+            org TEXT NOT NULL, phone TEXT NOT NULL, last_inbound_at REAL NOT NULL,
+            PRIMARY KEY (org, phone))''')
         self.connection.execute('''CREATE TABLE IF NOT EXISTS sync_runs (
             org TEXT NOT NULL, name TEXT NOT NULL, started_at REAL, finished_at REAL,
             result TEXT NOT NULL, PRIMARY KEY (org, name))''')

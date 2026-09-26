@@ -14,7 +14,12 @@ src/hustleai/
     zoho/
       auth.py                    Verified HTTPS context
       client.py                  OAuth refresh, GET/POST/PUT, PDFs and pagination
-    whatsapp/                    Documented future gateway boundary
+    whatsapp/
+      config.py                  Private settings; business number is a setting
+      webhook.py                 Signature check and event parsing
+      client.py                  Cloud API text, template and document sends
+      server.py                  Webhook HTTP server, durable queue, recovery
+      owner_agent.py             Optional forwarder for owner free text
   workflows/
     service.py                   Facade, proposals and confirmed dispatch
     clients.py                   Client resolution and creation preparation
@@ -23,8 +28,10 @@ src/hustleai/
     invoice_review.py            Reorder history, revisions and version approval
     forecast.py                  Weekly reorder forecast and customer cycles
     orders.py                    Supabase copy of Zoho invoices and nightly sync
+    messaging.py                 Owner commands and customer referrals
+    outbox.py                    Idempotent sends and 24-hour window handling
   mcp/
-    owner_server.py              17 owner-side Hermes tools
+    owner_server.py              18 owner-side Hermes tools
   storage/
     files.py                     Atomic private local writes
     backend.py                   Explicit backend selection; no outage fallback
@@ -42,6 +49,7 @@ src/hustleai/
     contacts.py                  Configure/sync/lookup command
     forecast.py                  Weekly forecast and cycle command
     orders.py                    Orders sync and status command
+    whatsapp.py                  Gateway setup, check, test and serve
 supabase/
   migrations/                    Applied initial PostgreSQL schema
   README.md                      Migration and cutover checklist

@@ -1,0 +1,8 @@
+# HTTPS in front of the WhatsApp gateway. Meta only calls HTTPS webhooks.
+# Replace the domain; Caddy obtains and renews the certificate automatically.
+# Webhook URL for the Meta app: https://hustleai.example.com/webhook
+hustleai.example.com {
+    reverse_proxy /webhook 127.0.0.1:8085
+    reverse_proxy /health 127.0.0.1:8085
+    respond 404
+}

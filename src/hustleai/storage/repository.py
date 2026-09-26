@@ -20,7 +20,8 @@ class WorkflowRepository:
     def table(self, name):
         """Return a qualified internal table name (never accepts external input)."""
         if name not in ('operations', 'invoice_reviews', 'invoice_approvals', 'phone_mappings',
-                        'customer_order_cycles', 'reorder_forecasts', 'orders', 'sync_runs'):
+                        'customer_order_cycles', 'reorder_forecasts', 'orders', 'sync_runs',
+                        'webhook_events', 'delivery_attempts', 'conversation_windows'):
             raise ValueError('Unknown storage table.')
         return self.prefix + name
 
@@ -302,6 +303,110 @@ class WorkflowRepository:
             return None
         result = json.loads(row[2]) if isinstance(row[2], str) else row[2]
         return {'started': self.decode_time(row[0]), 'finished': self.decode_time(row[1]), 'result': result}
+
+    # --- WhatsApp gateway -------------------------------------------------
+
+    def claim_webhook_event(self, event_id, event_type, payload):
+        """Store a verified event once. True if new, False for a redelivery."""
+        with self.transaction():
+            cursor = self.connection.execute(
+                f"""INSERT INTO {self.table('webhook_events')} ({self.org_column},provider_event_id,event_type,payload,received_at)
+                VALUES ({self.param},{self.param},{self.param},{self.param},{self.param})
+                ON CONFLICT ({self.org_column},provider_event_id) DO NOTHING""",
+                (self.organization, event_id, event_type, self.encode_json(payload), self.encode_time(time.time())))
+            return cursor.rowcount == 1
+
+    def finish_webhook_event(self, event_id):
+        """Mark an event processed so startup recovery skips it."""
+        with self.transaction():
+            self.connection.execute(
+                f"UPDATE {self.table('webhook_events')} SET processed_at={self.param} WHERE {self.org_column}={self.param} AND provider_event_id={self.param}",
+                (self.encode_time(time.time()), self.organization, event_id))
+
+    def unprocessed_webhook_events(self, limit=500):
+        """Return stored but unprocessed event payloads, oldest first."""
+        rows = self.connection.execute(
+            f"SELECT payload FROM {self.table('webhook_events')} WHERE {self.org_column}={self.param} AND processed_at IS NULL ORDER BY received_at LIMIT {int(limit)}",
+            (self.organization,)).fetchall()
+        return [json.loads(r[0]) if isinstance(r[0], str) else r[0] for r in rows]
+
+    def touch_conversation(self, phone):
+        """Record an inbound message time, opening WhatsApp's 24-hour window."""
+        with self.transaction():
+            self.connection.execute(
+                f"""INSERT INTO {self.table('conversation_windows')} ({self.org_column},phone,last_inbound_at)
+                VALUES ({self.param},{self.param},{self.param})
+                ON CONFLICT ({self.org_column},phone) DO UPDATE SET last_inbound_at=excluded.last_inbound_at""",
+                (self.organization, phone, self.encode_time(time.time())))
+
+    def last_inbound(self, phone):
+        """Unix time of the latest inbound message from phone, or None."""
+        row = self.connection.execute(
+            f"SELECT last_inbound_at FROM {self.table('conversation_windows')} WHERE {self.org_column}={self.param} AND phone={self.param}",
+            (self.organization, phone)).fetchone()
+        return self.decode_time(row[0]) if row else None
+
+    DELIVERY_COLUMNS = ('id', 'purpose', 'idempotency_key', 'recipient', 'provider_message_id',
+                        'status', 'message', 'error', 'attempts')
+
+    def delivery(self, key):
+        """Return the outbox row for an idempotency key, or None."""
+        row = self.connection.execute(
+            f"SELECT {','.join(self.DELIVERY_COLUMNS)} FROM {self.table('delivery_attempts')} WHERE {self.org_column}={self.param} AND idempotency_key={self.param}",
+            (self.organization, key)).fetchone()
+        return self.delivery_row(row)
+
+    def delivery_row(self, row):
+        """Decode an outbox row selected with DELIVERY_COLUMNS."""
+        if row is None:
+            return None
+        result = dict(zip(self.DELIVERY_COLUMNS, row))
+        if isinstance(result['message'], str):
+            result['message'] = json.loads(result['message'])
+        return result
+
+    def create_delivery(self, delivery_id, purpose, key, recipient, message):
+        """Insert a pending outbox row once; return the stored row either way."""
+        now = self.encode_time(time.time())
+        with self.transaction():
+            self.connection.execute(
+                f"""INSERT INTO {self.table('delivery_attempts')} (id,{self.org_column},purpose,idempotency_key,recipient,status,message,attempts,created_at,updated_at)
+                VALUES ({','.join([self.param] * 10)})
+                ON CONFLICT ({self.org_column},idempotency_key) DO NOTHING""",
+                (delivery_id, self.organization, purpose, key, recipient, 'pending', self.encode_json(message), 0, now, now))
+        return self.delivery(key)
+
+    def update_delivery(self, key, status, provider_message_id=None, error=None, attempted=False):
+        """Set an outbox row's status, provider message ID and last error."""
+        with self.transaction():
+            self.connection.execute(
+                f"""UPDATE {self.table('delivery_attempts')} SET status={self.param},
+                provider_message_id=COALESCE({self.param},provider_message_id), error={self.param},
+                attempts=attempts+{1 if attempted else 0}, updated_at={self.param}
+                WHERE {self.org_column}={self.param} AND idempotency_key={self.param}""",
+                (status, provider_message_id, error, self.encode_time(time.time()), self.organization, key))
+
+    def apply_delivery_status(self, provider_message_id, status, error=None):
+        """Apply a Meta status webhook without moving a message backwards."""
+        rank = {'pending': 0, 'waiting_window': 0, 'sent': 1, 'delivered': 2, 'read': 3, 'failed': 4}
+        if status not in rank:
+            return
+        with self.transaction():
+            row = self.connection.execute(
+                f"SELECT status FROM {self.table('delivery_attempts')} WHERE {self.org_column}={self.param} AND provider_message_id={self.param}",
+                (self.organization, provider_message_id)).fetchone()
+            if row is None or rank[status] <= rank.get(row[0], 0):
+                return
+            self.connection.execute(
+                f"UPDATE {self.table('delivery_attempts')} SET status={self.param}, error=COALESCE({self.param},error), updated_at={self.param} WHERE {self.org_column}={self.param} AND provider_message_id={self.param}",
+                (status, error, self.encode_time(time.time()), self.organization, provider_message_id))
+
+    def waiting_deliveries(self, recipient):
+        """Outbox rows held until the recipient writes again, oldest first."""
+        rows = self.connection.execute(
+            f"SELECT {','.join(self.DELIVERY_COLUMNS)} FROM {self.table('delivery_attempts')} WHERE {self.org_column}={self.param} AND recipient={self.param} AND status={self.param} ORDER BY created_at",
+            (self.organization, recipient, 'waiting_window')).fetchall()
+        return [self.delivery_row(r) for r in rows]
 
     def close(self):
         """Release the connection; callers must use finally or a context manager."""

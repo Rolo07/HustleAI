@@ -224,6 +224,36 @@ def render_markdown(report):
     return '\n'.join(lines) + '\n'
 
 
+def render_whatsapp(report):
+    """Render a forecast as plain WhatsApp text (no tables), for the owner."""
+    last_day = date.fromisoformat(report['window_end']) - timedelta(days=1)
+    lines = [f"*Reorder forecast {report['window_start']} to {last_day.isoformat()}*"]
+    if report.get('tracking_since'):
+        lines.append(f"Counting orders since {report['tracking_since']}.")
+    if report.get('orders_sync_stale'):
+        lines.append('Warning: orders were last synced more than two days ago.')
+    lines += ['', f"*Expected to order ({len(report['due'])})*"]
+    for c in report['due']:
+        where = c['area'] + (f", {c['suburb']}" if c['suburb'] else '')
+        lines.append(f"- {c['customer_name']} {c['phone']}: {c['predicted_date']}, {where}, "
+                     f"about R{c['expected_value']} ({c['confidence']})")
+    if not report['due']:
+        lines.append('- None this week.')
+    if report['products']:
+        lines += ['', '*Stock to order*'] + [f"- {p['name']}: {p['quantity']}" for p in report['products']]
+        lines.append(f"Estimated total: R{report['expected_value_total']} (past prices).")
+    if report['areas']:
+        lines += ['', '*Deliveries by area*']
+        lines += [f"- {a['area']}: " + ', '.join(c['customer_name'] for c in a['customers']) for a in report['areas']]
+    if report['overdue']:
+        lines += ['', f"*Overdue ({len(report['overdue'])})*"]
+        lines += [f"- {c['customer_name']} {c['phone']}: {c['days_overdue']} days" for c in report['overdue']]
+    if report['unpredictable']:
+        lines += ['', f"*Only one order so far ({len(report['unpredictable'])})*"]
+        lines.append(', '.join(c['customer_name'] for c in report['unpredictable']))
+    return '\n'.join(lines)
+
+
 class ForecastWorkflows:
     """Mixin using Service's API, storage, config and client lookup."""
 

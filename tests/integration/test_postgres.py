@@ -45,6 +45,8 @@ class PostgresTests(WorkflowTests):
                 cls.admin.execute(forecast.replace('hustle_private', cls.schema))
                 orders = (Path(__file__).parents[2] / 'supabase/migrations/202609270004_orders.sql').read_text()
                 cls.admin.execute(orders.replace('hustle_private', cls.schema))
+                gateway = (Path(__file__).parents[2] / 'supabase/migrations/202609270005_whatsapp_gateway.sql').read_text()
+                cls.admin.execute(gateway.replace('hustle_private', cls.schema))
         except BaseException:
             cls.admin.execute(sql.SQL('DROP SCHEMA IF EXISTS {} CASCADE').format(sql.Identifier(cls.schema)))
             cls.admin.close()
@@ -63,7 +65,7 @@ class PostgresTests(WorkflowTests):
         return PostgresRepository(ROOT, organization, db, self.schema)
 
     def setUp(self):
-        self.admin.execute(f'TRUNCATE {self.schema}.operations, {self.schema}.phone_mappings, {self.schema}.invoice_reviews, {self.schema}.invoice_approvals, {self.schema}.customer_order_cycles, {self.schema}.reorder_forecasts, {self.schema}.orders, {self.schema}.sync_runs CASCADE')
+        self.admin.execute(f'TRUNCATE {self.schema}.operations, {self.schema}.phone_mappings, {self.schema}.invoice_reviews, {self.schema}.invoice_approvals, {self.schema}.customer_order_cycles, {self.schema}.reorder_forecasts, {self.schema}.orders, {self.schema}.sync_runs, {self.schema}.webhook_events, {self.schema}.delivery_attempts, {self.schema}.conversation_windows CASCADE')
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         config = self.root / 'config.json'
@@ -122,7 +124,7 @@ class PostgresTests(WorkflowTests):
             self.admin.execute(f'CREATE TABLE {schema}.schema_migrations (version text PRIMARY KEY, checksum text NOT NULL)')
             self.admin.execute(f'INSERT INTO {schema}.schema_migrations VALUES (%s,%s)', (initial.name, hashlib.sha256(initial.read_bytes()).hexdigest()))
             applied = apply_upgrades(self.admin, directory, schema)
-            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql', '202609270004_orders.sql'])
+            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql', '202609270004_orders.sql', '202609270005_whatsapp_gateway.sql'])
             self.assertEqual(apply_upgrades(self.admin, directory, schema), [])
             with tempfile.TemporaryDirectory() as changed:
                 for path in directory.glob('*.sql'):
@@ -229,6 +231,47 @@ class PostgresTests(WorkflowTests):
             runtime.organization = '456'
             with self.assertRaises(errors.InsufficientPrivilege):
                 runtime.save_order(dict(order, invoice_id='79'), False, 'sync')
+        finally:
+            runtime.close()
+
+    def test_gateway_storage_and_isolation(self):
+        from psycopg import errors
+        store = self.s.store
+        event = {'kind': 'message', 'id': 'wamid.1', 'from': '+27837758811', 'text': 'HELP'}
+        self.assertTrue(store.claim_webhook_event('wamid.1', 'message', event))
+        self.assertFalse(store.claim_webhook_event('wamid.1', 'message', event))
+        self.assertEqual(store.unprocessed_webhook_events(), [event])
+        store.finish_webhook_event('wamid.1')
+        self.assertEqual(store.unprocessed_webhook_events(), [])
+        self.assertIsNone(store.last_inbound('+27837758811'))
+        store.touch_conversation('+27837758811')
+        self.assertLess(abs(store.last_inbound('+27837758811') - __import__('time').time()), 60)
+        row = store.create_delivery('d1', 'reply', 'reply:1', '+27837758811', {'type': 'text', 'body': 'hi'})
+        again = store.create_delivery('d2', 'reply', 'reply:1', '+27837758811', {'type': 'text', 'body': 'other'})
+        self.assertEqual((row['id'], again['id'], again['message']['body']), ('d1', 'd1', 'hi'))
+        store.update_delivery('reply:1', 'waiting_window', error='held')
+        self.assertEqual([r['id'] for r in store.waiting_deliveries('+27837758811')], ['d1'])
+        store.update_delivery('reply:1', 'sent', provider_message_id='wamid.out', attempted=True)
+        store.apply_delivery_status('wamid.out', 'read')
+        store.apply_delivery_status('wamid.out', 'delivered')
+        self.assertEqual((store.delivery('reply:1')['status'], store.delivery('reply:1')['attempts']), ('read', 1))
+        with self.assertRaises(errors.CheckViolation):
+            self.admin.execute(f"UPDATE {self.schema}.delivery_attempts SET status='bogus'")
+        other = self.repository('456')
+        try:
+            self.assertIsNone(other.delivery('reply:1'))
+            self.assertTrue(other.claim_webhook_event('wamid.1', 'message', event))  # per-organization IDs
+        finally:
+            other.close()
+        db = connect(ROOT)  # Restricted runtime login under the copied RLS policies.
+        runtime = PostgresRepository(ROOT, '123', db, self.schema)
+        try:
+            self.assertEqual(runtime.delivery('reply:1')['status'], 'read')
+            self.assertTrue(runtime.claim_webhook_event('wamid.2', 'message', event))
+            runtime.touch_conversation('+27820000001')
+            runtime.organization = '456'
+            with self.assertRaises(errors.InsufficientPrivilege):
+                runtime.touch_conversation('+27820000002')
         finally:
             runtime.close()
 
