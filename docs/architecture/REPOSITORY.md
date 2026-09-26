@@ -21,8 +21,9 @@ src/hustleai/
     invoices.py                  Invoice reads and validated creation payloads
     payments.py                  Payment preparation and allocation validation
     invoice_review.py            Reorder history, revisions and version approval
+    forecast.py                  Weekly reorder forecast and customer cycles
   mcp/
-    owner_server.py              14 owner-side Hermes tools
+    owner_server.py              17 owner-side Hermes tools
   storage/
     files.py                     Atomic private local writes
     backend.py                   Explicit backend selection; no outage fallback
@@ -38,6 +39,7 @@ src/hustleai/
     setup.py                     Initial OAuth setup
     upgrade.py                   Expanded OAuth grant
     contacts.py                  Configure/sync/lookup command
+    forecast.py                  Weekly forecast and cycle command
 supabase/
   migrations/                    Applied initial PostgreSQL schema
   README.md                      Migration and cutover checklist

@@ -15,9 +15,10 @@ from hustleai.workflows.clients import ClientWorkflows
 from hustleai.workflows.invoices import InvoiceCreation
 from hustleai.workflows.payments import PaymentWorkflows
 from hustleai.workflows.invoice_review import InvoiceWorkflows
+from hustleai.workflows.forecast import ForecastWorkflows
 
 
-class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflows):
+class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflows, ForecastWorkflows):
     """Compose owner-side operations while retaining the existing Service API."""
 
     def __init__(self, api=None, root=ROOT):
@@ -27,7 +28,8 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
             api: Optional API-compatible dependency, primarily for isolated tests.
                 If omitted, construct API and refresh the saved OAuth access token.
             root: Private runtime directory containing backend credentials and PDFs.
-                Configuration and credentials still use the module-level paths.
+                All PDFs go to root/invoice-pdfs. Configuration and credentials
+                still use the module-level paths.
 
         Raises:
             OSError: Configuration or local files cannot be read/created.
@@ -44,10 +46,12 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
         self.workflow_config = config
         self.root = Path(root)
         self.mapping = self.root / MAPPING.name
+        # One folder for every PDF: Zoho downloads and versioned review copies.
+        self.pdf_dir = self.root / 'invoice-pdfs'
         self.store = open_repository(config, self.root)
         self.db = self.store.connection  # Compatibility for existing local tests.
         try:
-            self.api = api or API(config['organization_id'])
+            self.api = api or API(config['organization_id'], self.pdf_dir)
             if str(self.api.organization) != str(config['organization_id']):
                 raise ValueError('API and storage organizations must match.')
         except BaseException:

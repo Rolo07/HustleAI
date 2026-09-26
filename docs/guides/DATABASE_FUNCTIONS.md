@@ -3,7 +3,7 @@
 **Status:** applied to Supabase and verified on 2026-09-26.
 
 Python now delegates four atomic changes to PostgreSQL functions in the
-`hustle_private` schema. Hermes continues to call the same 14 MCP tools;
+`hustle_private` schema. Hermes continues to call the same owner MCP tools;
 it does not receive SQL access. Simple reads remain parameterized queries.
 
 ## What each function does

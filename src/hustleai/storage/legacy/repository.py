@@ -15,6 +15,7 @@ class SQLiteRepository(WorkflowRepository):
     encode_json = staticmethod(json.dumps)
     encode_time = staticmethod(float)
     decode_time = staticmethod(float)
+    encode_date = staticmethod(lambda value: value.isoformat())
 
     def __init__(self, root, organization):
         """Open and initialize a legacy journal; never used as an outage fallback."""
@@ -29,6 +30,13 @@ class SQLiteRepository(WorkflowRepository):
         self.connection.execute('''CREATE TABLE IF NOT EXISTS invoice_approvals (
             approval_id TEXT PRIMARY KEY, review_id TEXT UNIQUE, org TEXT,
             invoice_id TEXT, version TEXT, recipient TEXT, created REAL, status TEXT)''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS customer_order_cycles (
+            org TEXT NOT NULL, contact_id TEXT NOT NULL, cycle_days INTEGER,
+            excluded INTEGER NOT NULL DEFAULT 0, note TEXT, updated_at TEXT,
+            PRIMARY KEY (org, contact_id))''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS reorder_forecasts (
+            org TEXT NOT NULL, run_date TEXT NOT NULL, window_start TEXT, window_end TEXT,
+            content TEXT NOT NULL, created_at TEXT, PRIMARY KEY (org, run_date))''')
         self.connection.commit()
 
     @contextmanager

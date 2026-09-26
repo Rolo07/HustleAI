@@ -63,6 +63,8 @@ class InvoiceCreation:
                 description. tax_id may inherit the product's configured tax.
                 no_tax=True is allowed only with explicit user approval and no
                 assigned tax; missing tax configuration is not implicit approval.
+                When the config sets vat_registered to false, no line may carry a
+                tax: rates are the final prices and no VAT is shown.
             invoice_date: ISO date (YYYY-MM-DD) used to calculate due date +7 days.
             contact_id: Optional client ID for a shared cellphone.
 
@@ -97,7 +99,10 @@ class InvoiceCreation:
         day = date.fromisoformat(invoice_date)
         if not lines or len(lines) > 100:
             raise ValueError('Supply 1–100 invoice lines.')
-        taxes = {str(t['tax_id']): t for t in self.api.get('settings/taxes')['taxes']}
+        # vat_registered False means the business may not show VAT at all.
+        # Missing means unknown: keep requiring an explicit tax decision per line.
+        unregistered = self.workflow_config.get('vat_registered') is False
+        taxes = {} if unregistered else {str(t['tax_id']): t for t in self.api.get('settings/taxes')['taxes']}
         prepared = []
         total = Decimal('0')
         for line in lines:
@@ -105,8 +110,11 @@ class InvoiceCreation:
             item = self.api.get('items/' + identifier(item_id))['item'] if item_id else {}
             if item.get('status') == 'inactive':
                 raise ValueError('Cannot invoice an inactive product.')
-            tax_id = str(line.get('tax_id') or item.get('tax_id') or '')
-            no_tax = line.get('no_tax') is True
+            if unregistered and line.get('tax_id'):
+                raise ValueError('The business is not VAT-registered; invoice lines cannot carry a tax.')
+            # An unregistered business never inherits a product's tax.
+            tax_id = '' if unregistered else str(line.get('tax_id') or item.get('tax_id') or '')
+            no_tax = unregistered or line.get('no_tax') is True
             if no_tax and tax_id:
                 raise ValueError('Cannot combine no_tax with an assigned tax.')
             if tax_id not in taxes and not no_tax:
@@ -125,10 +133,12 @@ class InvoiceCreation:
                 record['item_id'] = identifier(item_id)
             prepared.append(record)
             total += rate * quantity
+        no_tax_note = ('Not VAT-registered; no VAT shown' if unregistered
+                       else 'No tax applied; explicitly requested')
         payload = {'customer_id': str(customer['contact_id']), 'date': day.isoformat(),
                    'due_date': (day + timedelta(days=7)).isoformat(), 'payment_terms': 7,
-                   'is_inclusive_tax': True, 'line_items': prepared,
+                   'is_inclusive_tax': not unregistered, 'line_items': prepared,
                    'send': False}
         return payload, {'customer_name': customer['contact_name'],
                              'currency': 'ZAR', 'estimated_total': str(total.quantize(Decimal('.01'))),
-                             'taxes': [taxes[l['tax_id']] if l.get('tax_id') else {'treatment': 'No tax applied; explicitly requested'} for l in prepared], 'invoice': payload}
+                             'taxes': [taxes[l['tax_id']] if l.get('tax_id') else {'treatment': no_tax_note} for l in prepared], 'invoice': payload}

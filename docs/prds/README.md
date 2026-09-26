@@ -9,7 +9,7 @@ Zoho tools and the code walkthrough remain documented under [docs](../architectu
 
 ## Visual flow guide
 
-Open [flow-guide.html](../flow-guide.html) in a browser to view all eight diagrams
+Open [flow-guide.html](../flow-guide.html) in a browser to view all nine diagrams
 with navigation and zoom controls. It works offline without Mermaid support.
 Each PRD also embeds its standalone SVG diagram from [diagrams/](../diagrams).
 To regenerate the visuals after editing their source definitions, run
@@ -27,6 +27,7 @@ To regenerate the visuals after editing their source definitions, run
 | [06 — Approved customer delivery](06-approved-delivery.md) | The latest approved PDF reaches the correct client before Zoho is marked sent. |
 | [07 — Immediate referrals](07-referrals.md) | Unclear or unsupported enquiries reach Roland immediately. |
 | [08 — Daily summary](08-daily-summary.md) | Roland receives a consolidated report at 20:00 South African time. |
+| [09 — Weekly reorder forecast](09-reorder-forecast.md) | Roland sees who will order 7–14 days ahead, with stock, delivery areas and value. Implemented. |
 
 ## End-to-end experience
 
@@ -66,7 +67,8 @@ flowchart TD
 - Customer reorder confirmation authorizes that specific draft creation. This is
   a scoped exception to the current tools' owner-only write confirmation rule,
   not a grant of general Zoho access to customers.
-- Invoices use ZAR, intended VAT-inclusive prices, and seven-day payment terms.
+- Invoices use ZAR and seven-day payment terms. The business is not VAT-registered:
+  prices are final and invoices show no VAT (confirmed 2026-09-27).
 - Sending a PDF to Roland must not mark an invoice sent.
 - Roland's approval authorizes customer WhatsApp delivery of the latest version.
 - Unclear enquiries notify Roland immediately. Summaries arrive at 20:00 in
@@ -115,7 +117,7 @@ and scheduled summaries remain pending. The current MCP is owner-side only.
 | --- | --- |
 | Business number, VPS access, domain/webhook setup | Pending provisioning. |
 | Approved PDF path and update procedure | Pending artifact and configuration. |
-| Production tax treatment | Needs confirmation: Zoho currently has no configured taxes. Prior no-tax approval applied only to the live integration test. |
+| Production tax treatment | Decided 2026-09-27: not VAT-registered, so no VAT is shown. Set by `vat_registered: false`; revisit if the business registers. |
 | Meaning of last order | Proposed: latest non-void invoice, excluding known tests; approve selection rules before launch. |
 | Unknown numbers vs genuinely new customers | A lookup miss alone is insufficient; clarify and refer unresolved cases. |
 | New Zoho client creation | Not authorized automatically by name collection; proposed local enquiry record only. |

@@ -19,7 +19,8 @@ class WorkflowRepository:
 
     def table(self, name):
         """Return a qualified internal table name (never accepts external input)."""
-        if name not in ('operations', 'invoice_reviews', 'invoice_approvals', 'phone_mappings'):
+        if name not in ('operations', 'invoice_reviews', 'invoice_approvals', 'phone_mappings',
+                        'customer_order_cycles', 'reorder_forecasts'):
             raise ValueError('Unknown storage table.')
         return self.prefix + name
 
@@ -140,6 +141,77 @@ class WorkflowRepository:
                 f"UPDATE {self.table('invoice_reviews')} SET status='approved' WHERE review_id={self.param} AND {self.org_column}={self.param}",
                 (review['review_id'], self.organization))
             return approval_id
+
+    def order_cycles(self):
+        """Return owner forecast settings keyed by Zoho contact ID."""
+        rows = self.connection.execute(
+            f"SELECT contact_id,cycle_days,excluded,note FROM {self.table('customer_order_cycles')} WHERE {self.org_column}={self.param} ORDER BY contact_id",
+            (self.organization,)).fetchall()
+        return {str(cid): {'cycle_days': days, 'excluded': bool(excluded), 'note': note}
+                for cid, days, excluded, note in rows}
+
+    def set_order_cycle(self, contact_id, cycle_days, note=None):
+        """Save an owner-set reorder cycle and include the customer again."""
+        with self.transaction():
+            self.connection.execute(
+                f"""INSERT INTO {self.table('customer_order_cycles')} ({self.org_column},contact_id,cycle_days,excluded,note,updated_at)
+                VALUES ({self.param},{self.param},{self.param},{self.param},{self.param},CURRENT_TIMESTAMP)
+                ON CONFLICT ({self.org_column},contact_id) DO UPDATE SET cycle_days=excluded.cycle_days,
+                excluded=excluded.excluded, note=excluded.note, updated_at=CURRENT_TIMESTAMP""",
+                (self.organization, str(contact_id), int(cycle_days), False, note))
+
+    def set_forecast_excluded(self, contact_id, excluded, note=None):
+        """Exclude or re-include a customer, keeping any owner-set cycle."""
+        table = self.table('customer_order_cycles')
+        with self.transaction():
+            if excluded:
+                self.connection.execute(
+                    f"""INSERT INTO {table} ({self.org_column},contact_id,cycle_days,excluded,note,updated_at)
+                    VALUES ({self.param},{self.param},NULL,{self.param},{self.param},CURRENT_TIMESTAMP)
+                    ON CONFLICT ({self.org_column},contact_id) DO UPDATE SET excluded=excluded.excluded,
+                    note=excluded.note, updated_at=CURRENT_TIMESTAMP""",
+                    (self.organization, str(contact_id), True, note))
+                return
+            key = (self.organization, str(contact_id))
+            self.connection.execute(
+                f"DELETE FROM {table} WHERE {self.org_column}={self.param} AND contact_id={self.param} AND cycle_days IS NULL", key)
+            self.connection.execute(
+                f"UPDATE {table} SET excluded={self.param}, updated_at=CURRENT_TIMESTAMP WHERE {self.org_column}={self.param} AND contact_id={self.param}",
+                (False,) + key)
+
+    def clear_order_cycle(self, contact_id):
+        """Remove all owner forecast settings so history-based prediction applies."""
+        with self.transaction():
+            self.connection.execute(
+                f"DELETE FROM {self.table('customer_order_cycles')} WHERE {self.org_column}={self.param} AND contact_id={self.param}",
+                (self.organization, str(contact_id)))
+
+    def save_forecast(self, run_date, window_start, window_end, content):
+        """Save one report per run date; a rerun replaces that date's report."""
+        with self.transaction():
+            self.connection.execute(
+                f"""INSERT INTO {self.table('reorder_forecasts')} ({self.org_column},run_date,window_start,window_end,content,created_at)
+                VALUES ({self.param},{self.param},{self.param},{self.param},{self.param},CURRENT_TIMESTAMP)
+                ON CONFLICT ({self.org_column},run_date) DO UPDATE SET window_start=excluded.window_start,
+                window_end=excluded.window_end, content=excluded.content, created_at=CURRENT_TIMESTAMP""",
+                (self.organization, self.encode_date(run_date), self.encode_date(window_start),
+                 self.encode_date(window_end), self.encode_json(content)))
+
+    def forecast(self, run_date=None):
+        """Return the report for a run date, or the latest report, or None."""
+        table = self.table('reorder_forecasts')
+        if run_date is None:
+            cursor = self.connection.execute(
+                f'SELECT content FROM {table} WHERE {self.org_column}={self.param} ORDER BY run_date DESC LIMIT 1',
+                (self.organization,))
+        else:
+            cursor = self.connection.execute(
+                f'SELECT content FROM {table} WHERE {self.org_column}={self.param} AND run_date={self.param}',
+                (self.organization, self.encode_date(run_date)))
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return json.loads(row[0]) if isinstance(row[0], str) else row[0]
 
     def close(self):
         """Release the connection; callers must use finally or a context manager."""

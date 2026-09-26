@@ -27,3 +27,9 @@ backups/
 
 .supabase-migration.lock
 .storage-maintenance
+
+# Private weekly forecast reports (customer names and numbers)
+reports/
+
+# Local Claude Code settings and permissions
+.claude/

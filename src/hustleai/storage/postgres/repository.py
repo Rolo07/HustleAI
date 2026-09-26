@@ -68,6 +68,11 @@ class PostgresRepository(WorkflowRepository):
         return datetime.fromtimestamp(value, timezone.utc)
 
     @staticmethod
+    def encode_date(value):
+        """Pass calendar dates to PostgreSQL date columns unchanged."""
+        return value
+
+    @staticmethod
     def decode_time(value):
         """Expose UTC database timestamps as Unix seconds to expiry checks."""
         return value.timestamp()

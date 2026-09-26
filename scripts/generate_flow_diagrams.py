@@ -121,6 +121,25 @@ FLOWS = [
  ('retry',2,5,'Reconcile or retry','Keep the same report and period','stop'),
  ('done',1,6,'Record completion','Recover missing cutoffs after restart','success'),
  ], [('events','time','',''),('time','exists','',''),('exists','skip','Yes',''),('exists','build','No',''),('build','send','',''),('send','result','',''),('result','retry','No',''),('result','done','Yes','')]),
+('09-reorder-forecast', 'Weekly reorder forecast',
+ 'List customers expected to order 7–14 days ahead so Roland can order stock and plan deliveries.',
+ 'Read-only in Zoho. Roland chooses who is included by setting cycles or excluding customers.', [
+ ('time',1,0,'Monday 07:00 SA time','Weekly timer, or Roland asks Hermes','event'),
+ ('saved',1,1,'Report saved this week?','Rebuild only when refresh is asked','decision'),
+ ('reuse',2,1,'Return saved report','No Zoho requests','success'),
+ ('read',1,2,'Read Zoho invoice history','Real orders only: no drafts, voids or tests','action'),
+ ('excluded',1,3,'Excluded by Roland?','Checked for each customer','decision'),
+ ('skip',0,3,'Skip customer','Counted as excluded in the report','stop'),
+ ('cycle',1,4,'Cycle set by Roland?','Otherwise use order history','decision'),
+ ('owner',2,4,'Use Roland’s cycle','Last order date plus cycle days','owner'),
+ ('history',1,5,'Two or more orders?','Average gap of the last 3 orders','decision'),
+ ('unknown',0,5,'Unable to predict','Listed so Roland can set a cycle','stop'),
+ ('when',1,6,'When is the next order?','Customers due later are not listed','decision'),
+ ('overdue',0,6,'Overdue list','Expected date passed, no newer order','stop'),
+ ('check',1,7,'Recheck orders used','Drop hidden test orders; predict again','action'),
+ ('report',1,8,'Save the weekly report','Customers, stock, areas and value','success'),
+ ('roland',1,9,'Roland plans the week','Private file, command or Hermes','owner'),
+ ], [('time','saved','',''),('saved','reuse','Yes',''),('saved','read','No',''),('read','excluded','',''),('excluded','skip','Yes',''),('excluded','cycle','No',''),('cycle','owner','Yes',''),('cycle','history','No',''),('history','unknown','No',''),('history','when','Yes',''),('owner','when','','rightloop'),('when','overdue','Overdue',''),('when','check','In 7–14 days',''),('check','report','',''),('overdue','report','','leftloop'),('report','roland','','')]),
 ]
 
 COLORS = {'event':('#e0f2fe','#0369a1'), 'action':('#f1f5f9','#475569'),
@@ -179,7 +198,7 @@ def svg_for(slug, title, nodes, edges):
 
 
 def main():
-    """Write eight SVGs and an offline HTML guide with navigation and zoom."""
+    """Write nine SVGs and an offline HTML guide with navigation and zoom."""
     target=ROOT/'diagrams'; target.mkdir(exist_ok=True)
     nav=[]; cards=[]
     for index,(slug,title,intro,note,nodes,edges) in enumerate(FLOWS,1):
@@ -198,14 +217,14 @@ def main():
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f3f6fa;scroll-behavior:smooth}*{box-sizing:border-box}body{margin:0}a{color:#2455ad}header{background:#11243b;color:#fff;padding:48px max(28px,calc((100vw - 1360px)/2));border-bottom:5px solid #2dd4bf}header h1{font-size:clamp(30px,4vw,48px);letter-spacing:-1.5px;margin:8px 0 12px}header p{max-width:790px;color:#d1deec;line-height:1.7}.eyebrow{font-size:12px;letter-spacing:2px;font-weight:750;color:#0f766e}.tag{display:inline-block;padding:6px 12px;background:#263b52;border:1px solid #476078;border-radius:99px;font-size:12px;color:#e0f2fe}.layout{max-width:1420px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px;padding:30px 24px}aside{position:sticky;top:24px;align-self:start}aside h2{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#64748b}nav a{display:flex;gap:12px;padding:11px 9px;text-decoration:none;color:#334155;font-size:14px;border-radius:8px;line-height:1.4}nav a:hover,nav a:focus{background:#dce8f4}nav span{font-variant-numeric:tabular-nums;color:#0f766e;font-weight:700}.legend{font-size:12px;display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}.legend span{padding:5px 9px;border-radius:5px;border:1px solid #cbd5e1}section{background:white;border:1px solid #dbe3ed;border-radius:18px;margin-bottom:32px;box-shadow:0 8px 28px #10233b06;scroll-margin-top:20px;overflow:hidden}.section-head{padding:26px 28px 8px;display:flex;gap:20px;justify-content:space-between;align-items:start}h2{font-size:26px;letter-spacing:-.6px;margin:6px 0 10px}.section-head p{line-height:1.6;color:#526176;max-width:690px}.section-head .eyebrow{color:#0f766e;margin:0}.prd{white-space:nowrap;font-size:13px;margin-top:12px}.callout{margin:6px 28px 18px;padding:13px 16px;border-left:3px solid #8b5cf6;background:#f5f3ff;color:#51368b;font-size:14px;line-height:1.6}.controls{display:flex;align-items:center;gap:8px;padding:0 28px 12px}.controls button{border:1px solid #cbd5e1;background:white;border-radius:6px;min-width:36px;height:32px;cursor:pointer;color:#334155}.controls button:hover{background:#e8eff6}.controls a{font-size:13px;margin-left:8px}.zoom-status{margin-left:auto;font-size:12px;color:#64748b}.diagram{overflow:auto;padding:12px 14px 24px}.diagram img{display:block;width:100%;height:auto;max-width:none}.note{font-size:13px;line-height:1.7;color:#64748b}footer{padding:24px;text-align:center;color:#64748b;font-size:13px}button:focus-visible,a:focus-visible,.diagram:focus-visible{outline:3px solid #0d9488;outline-offset:3px}@media(max-width:850px){.layout{display:block;padding:18px 12px}aside{position:static;margin-bottom:24px}nav{display:grid;grid-template-columns:1fr 1fr}.section-head{padding:20px;display:block}.callout{margin:6px 20px 16px}.diagram img{min-width:850px}.controls{padding-left:20px;padding-right:20px}header{padding:32px 22px}}@media print{header{background:white;color:#172033;padding:15px}header p{color:#475569}.layout{display:block;padding:0}aside,.controls,.prd,footer{display:none}section{break-inside:avoid;box-shadow:none;margin-bottom:20px}.diagram{overflow:visible}.diagram img{width:100%!important;min-width:0!important}h2{font-size:20px}.section-head,.callout{padding:10px;margin:0}.tag{color:#172033;background:white}*{scroll-behavior:auto}}
 </style></head><body>
-<header><span class="tag">Product design · Not yet deployed</span><h1>WhatsApp workflow atlas</h1><p>See how customer messages move from enquiry to invoice, where Roland steps in, and when the system may act. Eight visual flows for the Hermes + Zoho integration.</p></header>
+<header><span class="tag">Product design · Not yet deployed</span><h1>WhatsApp workflow atlas</h1><p>See how customer messages move from enquiry to invoice, where Roland steps in, and when the system may act. Nine visual flows for the Hermes + Zoho integration.</p></header>
 <div class="layout"><aside><h2>Explore the flows</h2><nav>'''+''.join(nav)+'''</nav><div class="legend"><span style="background:#e0f2fe">Trigger</span><span style="background:#fef3c7">Decision</span><span style="background:#ede9fe">Roland</span><span style="background:#fff1f2">Exception</span><span style="background:#dcfce7">Outcome</span></div><p class="note">Follow the arrows from top to bottom. Branch labels explain decisions; returning arrows indicate another review.</p><p class="note">Open any SVG in its own tab for a larger view. On a phone, swipe diagrams sideways. This guide works offline.</p><p><a href="prds/README.md">Requirements index ↗</a></p></aside><main>'''+''.join(cards)+'''</main></div>
 <footer>HustleAI · Agreed product flows. Open decisions and implementation dependencies remain in each PRD.</footer>
 <script>
 document.querySelectorAll('section').forEach(section=>{let scale=1;const img=section.querySelector('img');section.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{const action=button.dataset.zoom;scale=action==='reset'?1:Math.min(2.5,Math.max(.6,scale+(action==='in'?.2:-.2)));img.style.width=(scale*100)+'%';section.querySelector('.zoom-status').textContent=Math.round(scale*100)+'%';}));});
 </script></body></html>'''
     (ROOT/'flow-guide.html').write_text(html)
-    print('Generated eight SVG diagrams and flow-guide.html')
+    print('Generated nine SVG diagrams and flow-guide.html')
 
 
 if __name__=='__main__':

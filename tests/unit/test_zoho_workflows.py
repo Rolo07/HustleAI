@@ -110,6 +110,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(result['lines'][0]['review_required'])
         self.assertEqual(self.api.puts, [])
 
+    def test_reorder_skips_vat_checks_when_not_registered(self):
+        self.historical('3', '2026-09-20')
+        self.s.workflow_config['vat_registered'] = False
+        issues = self.s.reorder_invoice(PHONE)['lines'][0]['review_required']
+        self.assertFalse(any('VAT' in i or 'tax' in i for i in issues))
+
     def test_reorder_tie_requires_selection(self):
         self.historical('3', '2026-09-20')
         self.historical('4', '2026-09-20')

@@ -1,0 +1,12 @@
+# Every Monday at 07:00 South African time, whatever the server timezone.
+# Persistent=true runs a missed job once after the server comes back.
+# Enable: sudo systemctl enable --now hustleai-forecast.timer
+[Unit]
+Description=Run the HustleAI reorder forecast every Monday morning
+
+[Timer]
+OnCalendar=Mon *-*-* 07:00:00 Africa/Johannesburg
+Persistent=true
+
+[Install]
+WantedBy=timers.target

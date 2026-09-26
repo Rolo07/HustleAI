@@ -40,6 +40,9 @@ class PostgresTests(WorkflowTests):
                 for table in ('operations', 'phone_mappings', 'invoice_reviews', 'invoice_approvals'):
                     cls.admin.execute(f'GRANT SELECT,INSERT,UPDATE ON {cls.schema}.{table} TO hustleai_runtime')
                     cls.admin.execute(f"CREATE POLICY test_org ON {cls.schema}.{table} TO hustleai_runtime USING (organization_id='123') WITH CHECK (organization_id='123')")
+                # The forecast migration copies the operations policy above.
+                forecast = (Path(__file__).parents[2] / 'supabase/migrations/202609260003_reorder_forecast.sql').read_text()
+                cls.admin.execute(forecast.replace('hustle_private', cls.schema))
         except BaseException:
             cls.admin.execute(sql.SQL('DROP SCHEMA IF EXISTS {} CASCADE').format(sql.Identifier(cls.schema)))
             cls.admin.close()
@@ -58,7 +61,7 @@ class PostgresTests(WorkflowTests):
         return PostgresRepository(ROOT, organization, db, self.schema)
 
     def setUp(self):
-        self.admin.execute(f'TRUNCATE {self.schema}.operations, {self.schema}.phone_mappings, {self.schema}.invoice_reviews, {self.schema}.invoice_approvals CASCADE')
+        self.admin.execute(f'TRUNCATE {self.schema}.operations, {self.schema}.phone_mappings, {self.schema}.invoice_reviews, {self.schema}.invoice_approvals, {self.schema}.customer_order_cycles, {self.schema}.reorder_forecasts CASCADE')
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         config = self.root / 'config.json'
@@ -117,7 +120,7 @@ class PostgresTests(WorkflowTests):
             self.admin.execute(f'CREATE TABLE {schema}.schema_migrations (version text PRIMARY KEY, checksum text NOT NULL)')
             self.admin.execute(f'INSERT INTO {schema}.schema_migrations VALUES (%s,%s)', (initial.name, hashlib.sha256(initial.read_bytes()).hexdigest()))
             applied = apply_upgrades(self.admin, directory, schema)
-            self.assertEqual(applied, ['202609260002_workflow_functions.sql'])
+            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql'])
             self.assertEqual(apply_upgrades(self.admin, directory, schema), [])
             with tempfile.TemporaryDirectory() as changed:
                 for path in directory.glob('*.sql'):
@@ -155,6 +158,40 @@ class PostgresTests(WorkflowTests):
         functions = self.admin.execute("SELECT p.prosecdef, has_function_privilege('anon',p.oid,'EXECUTE'), has_function_privilege('authenticated',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=%s", (self.schema,)).fetchall()
         self.assertEqual(len(functions), 4)
         self.assertTrue(all(row == (False, False, False) for row in functions))
+
+    def test_forecast_settings_and_reports_are_organization_scoped(self):
+        from datetime import date
+        from psycopg import errors
+        store = self.s.store
+        store.set_order_cycle('1', 21, 'Customer')
+        store.set_forecast_excluded('1', True, 'Customer')
+        store.set_forecast_excluded('9', True, 'Other')
+        store.set_forecast_excluded('9', False)
+        self.assertEqual(store.order_cycles(), {'1': {'cycle_days': 21, 'excluded': True, 'note': 'Customer'}})
+        monday = date(2026, 10, 5)
+        for version in (1, 2):
+            store.save_forecast(monday, date(2026, 10, 12), date(2026, 10, 19), {'run_date': '2026-10-05', 'v': version})
+        self.assertEqual(store.forecast(), {'run_date': '2026-10-05', 'v': 2})
+        self.assertEqual(store.forecast(monday)['v'], 2)
+        self.assertEqual(self.admin.execute(f'SELECT count(*) FROM {self.schema}.reorder_forecasts').fetchone()[0], 1)
+        with self.assertRaises(errors.CheckViolation):
+            self.admin.execute(f"INSERT INTO {self.schema}.customer_order_cycles (organization_id,contact_id) VALUES ('123','5')")
+        other = self.repository('456')
+        try:
+            self.assertEqual(other.order_cycles(), {})
+            self.assertIsNone(other.forecast())
+        finally:
+            other.close()
+        db = connect(ROOT)  # Restricted runtime login under the copied RLS policy.
+        runtime = PostgresRepository(ROOT, '123', db, self.schema)
+        try:
+            self.assertEqual(runtime.order_cycles()['1']['cycle_days'], 21)
+            self.assertEqual(runtime.forecast()['v'], 2)
+            runtime.organization = '456'
+            with self.assertRaises(errors.InsufficientPrivilege):
+                runtime.set_order_cycle('7', 14)
+        finally:
+            runtime.close()
 
     def test_database_rejects_expired_claim(self):
         oid = self.s.proposal('invoice', {}, {})['operation_id']

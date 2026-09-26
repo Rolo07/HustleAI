@@ -16,7 +16,8 @@ flowchart LR
     Hermes <--> MCP["Zoho MCP tools<br/>mcp/owner_server.py"]
     MCP --> Service["Business rules<br/>workflows/"]
     Service <--> Zoho["Zoho Invoice API"]
-    Service <--> Local["Local files<br/>Phone mapping, operation journal, PDFs"]
+    Service <--> DB["Supabase PostgreSQL<br/>Phone mapping, operation journal, reviews"]
+    Service <--> Local["Private local files<br/>Credentials, PDFs"]
 ```
 
 ## 1. Start with the files
@@ -156,8 +157,8 @@ python3 zoho_clients.py sync
 ```
 
 Sync reads the contact list and each contact's details, including contact
-persons. Only a complete successful scan replaces the mapping. A failed sync
-preserves the previous file. A missing lookup result does not prove that no
+persons. Only a complete successful scan replaces the mapping in Supabase. A
+failed sync preserves the previous mapping. A missing lookup result does not prove that no
 such client exists in Zoho; the index may be stale.
 
 ## 5. How invoice creation works
@@ -172,7 +173,8 @@ price and tax treatment, and then call `create_invoice`.
 - There are between 1 and 100 line items.
 - Prices and quantities are positive.
 - Any selected product is active.
-- Tax comes from configured Zoho settings, or no tax is explicitly approved.
+- No line carries a tax when the business is not VAT-registered. Otherwise
+  tax comes from configured Zoho settings, or no tax is explicitly approved.
 
 It calculates the due date as **invoice date + seven days** and prepares an
 unsent invoice.
@@ -182,7 +184,7 @@ sequenceDiagram
     participant You as Roland
     participant Hermes
     participant Service as Zoho service
-    participant Journal as Local operation journal
+    participant Journal as Supabase operation journal
     participant Zoho
 
     You->>Hermes: Request an invoice
@@ -209,6 +211,12 @@ inclusive or invent a tax percentage.
 Use `no_tax: true` only after explicit approval. Missing taxes in Zoho are not
 implicit permission to omit tax. The September 2026 live test used the existing
 Zoho setup, with no separate tax calculation, by explicit request.
+
+The business is **not VAT-registered**, so `.zoho-local.json` sets
+`"vat_registered": false`. Invoices never carry a tax, rates are the final
+prices, and no VAT appears on invoices. A line that supplies a `tax_id` is
+rejected, and a product's tax is never inherited. If the setting is removed,
+the strict rules below apply again.
 
 The preview total is an estimate calculated locally with `Decimal`. Zoho
 calculates the final invoice total; its line rounding can differ.
@@ -263,7 +271,8 @@ that it belongs to the selected client and uses ZAR. The invoice ID is Zoho's
 numeric identifier, not the human-readable invoice number.
 
 `invoice_pdf` performs that same ownership check, then saves the file under
-`invoice-pdfs/<invoice_id>.pdf`.
+`invoice-pdfs/<invoice_id>.pdf` in the private data directory. Review copies go
+to `invoice-pdfs/reviews/` in the same folder.
 
 ```mermaid
 flowchart LR
@@ -298,17 +307,23 @@ Recording a payment changes Zoho's accounting records. The live test payment
 made the test invoice appear paid, but no money moved. Bank-statement uploads
 and automatic payment matching are outside the current implementation.
 
-## 9. Local data and operating limits
+## 9. Where data lives and operating limits
 
-| Local artifact | Contents and role |
+| Location | Contents and role |
 | --- | --- |
-| `.zoho-credentials.json` | OAuth credentials and endpoint metadata; keep private. |
-| `.zoho-local.json` | Organization ID and default phone country code. |
-| `zoho-client-phone-map.md` | Contact ID/phone index kept locally. |
-| `.zoho-operations.sqlite3` | Pending operations and saved creation results. |
-| `invoice-pdfs/` | Downloaded invoice documents. |
+| Zoho Invoice | Clients, products, invoices and recorded payments. The source of truth. |
+| Supabase `hustle_private` schema | Phone mapping, operation journal, invoice reviews and approvals, forecast settings and reports. |
+| `.zoho-credentials.json` | Zoho OAuth credentials and endpoint metadata; keep private. |
+| `.zoho-local.json` | Organization ID, phone country code, storage backend and `vat_registered`. |
+| `.supabase-runtime.json` | Restricted database login used by the app; keep private. |
+| `invoice-pdfs/` | Downloaded invoice PDFs, with versioned review copies in `reviews/`. |
+| `reports/` | Private weekly reorder forecast reports. |
 
-These artifacts are excluded from Git. Newly created private files use
+The old `zoho-client-phone-map.md` and `.zoho-operations.sqlite3` files were
+removed after their contents were verified in Supabase. A database outage stops
+work; the app never falls back to local files.
+
+All local artifacts are excluded from Git. Newly created private files use
 owner-only permissions. Their contents still require secure handling and
 backups. On deployment they should remain on the VPS's local disk under the
 Hermes OS user, not in prompts or a public directory.

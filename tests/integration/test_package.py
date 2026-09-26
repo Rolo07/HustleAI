@@ -26,7 +26,7 @@ class PackageTests(unittest.TestCase):
             self.assertTrue(all(p.parent == paths[0] for p in paths[1:]))
             self.assertEqual(list(Path(directory).iterdir()), [])
 
-    def test_mcp_discovers_fourteen_tools_without_credentials(self):
+    def test_mcp_discovers_seventeen_tools_without_credentials(self):
         """Owner server can initialize and advertise tools with empty private state."""
         async def check(directory):
             parameters = StdioServerParameters(command=sys.executable,
@@ -36,8 +36,10 @@ class PackageTests(unittest.TestCase):
                 async with ClientSession(read, write) as client:
                     await client.initialize()
                     tools = (await client.list_tools()).tools
-                    self.assertEqual(len(tools), 14)
-                    self.assertIn('approve_invoice_version', {t.name for t in tools})
+                    self.assertEqual(len(tools), 17)
+                    names = {t.name for t in tools}
+                    for name in ('approve_invoice_version', 'reorder_forecast', 'set_reorder_cycle', 'exclude_from_forecast'):
+                        self.assertIn(name, names)
                     self.assertTrue(all(t.description for t in tools))
         with tempfile.TemporaryDirectory() as directory:
             asyncio.run(check(directory))

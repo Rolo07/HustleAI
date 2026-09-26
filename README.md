@@ -6,7 +6,7 @@ future WhatsApp customer automation and active hosted Supabase storage.
 ## Start here
 
 - [Repository architecture](docs/architecture/REPOSITORY.md) — code layout and dependency boundaries.
-- [Visual flow guide](docs/flow-guide.html) — eight rendered diagrams; opens offline in a browser.
+- [Visual flow guide](docs/flow-guide.html) — nine rendered diagrams; opens offline in a browser.
 - [Code walkthrough](docs/architecture/CODE_WALKTHROUGH.md) — introduction for first-time readers.
 - [All documentation](docs/README.md) — PRDs, setup and workflow guides.
 
@@ -49,8 +49,65 @@ python3 zoho_clients.py lookup
 python3 zoho_clients.py sync
 ```
 
-The owner MCP exposes 14 tools. Customer gateway authorization and WhatsApp
+The owner MCP exposes 17 tools, including a weekly
+[reorder forecast](docs/guides/REORDER_FORECAST.md) for stock and delivery planning. Customer gateway authorization and WhatsApp
 sending are not implemented yet. See [workflow tools](docs/guides/ZOHO_WORKFLOW_TOOLS.md).
+
+## Tax
+
+The business is not VAT-registered. `.zoho-local.json` sets
+`"vat_registered": false`, so invoices carry no tax, prices are final and no VAT
+is shown. If the business registers for VAT, remove that setting, create the
+VAT tax in Zoho and assign it to products.
+
+## Weekly reorder forecast
+
+Every Monday at 07:00 South African time, the forecast lists customers expected
+to order **7 to 14 days** later. It reads Zoho only and never contacts
+customers. See the [flow and PRD](docs/prds/09-reorder-forecast.md) and the
+[operating guide](docs/guides/REORDER_FORECAST.md).
+
+![Weekly reorder forecast flow](docs/diagrams/09-reorder-forecast.svg)
+
+**How the next order is predicted**
+
+1. Only real orders count: sent, overdue, paid, partially paid or unpaid
+   invoices. Drafts, voids, test invoices and future-dated invoices are ignored.
+2. Several invoices on one day count as one order.
+3. The cycle is the average gap between the customer's **last three orders**.
+   The next order is expected on the last order date plus that cycle.
+4. A cycle you set for a customer replaces the history average.
+5. Confidence is low with only two orders, or when the gaps are uneven.
+6. A customer with one order is listed under "Unable to predict" until you set a cycle.
+
+**Choosing which customers appear**
+
+Every customer with order history is included automatically. Adjust the list
+with these commands, or ask Hermes to do the same:
+
+```sh
+.venv/bin/hustleai-forecast cycles set 0821234567 21    # order every 21 days
+.venv/bin/hustleai-forecast cycles exclude 0821234567   # stopped ordering
+.venv/bin/hustleai-forecast cycles include 0821234567   # bring back
+.venv/bin/hustleai-forecast cycles clear 0821234567     # use order history again
+.venv/bin/hustleai-forecast cycles list                 # show your settings
+```
+
+Add `--contact-id` when several clients share one number. Excluding a customer
+keeps any cycle you set, and setting a cycle includes them again.
+
+**Running it**
+
+```sh
+.venv/bin/hustleai-forecast run --print             # build or reuse this week's report
+.venv/bin/hustleai-forecast run --refresh --print   # rebuild from Zoho now
+```
+
+The report lists expected customers, stock totals per product, deliveries by
+area, overdue customers, customers without enough history, and an estimated
+value from past invoices. It is saved in Supabase and in the private `reports/`
+folder, which is excluded from Git. Schedule files for the Mac and the VPS are
+in `deploy/schedule/`; install only one.
 
 ## Data and Supabase status
 

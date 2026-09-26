@@ -1,0 +1,12 @@
+# VPS: weekly reorder forecast job. Copy to /etc/systemd/system/ with the timer.
+# Runs as the Hermes service user; reads private files from HUSTLEAI_DATA_DIR.
+[Unit]
+Description=HustleAI weekly reorder forecast
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=hermes
+Environment=HUSTLEAI_DATA_DIR=/var/lib/hustleai
+ExecStart=/opt/hustleai/.venv/bin/hustleai-forecast run

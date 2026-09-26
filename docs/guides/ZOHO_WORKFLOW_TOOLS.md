@@ -27,8 +27,9 @@ line descriptions. Add test IDs when fixtures do not use those markers. A date
 tie requires an explicit source invoice selection; it never guesses a winner.
 
 An empty or ambiguous history raises a clear error for referral. Current catalog
-records are returned alongside historical lines. Catalog prices are not assumed
-VAT-inclusive; tax, inactive items, delivery charges and discounts need review.
+records are returned alongside historical lines. Inactive items, delivery charges
+and discounts need review. Tax and VAT checks are skipped when the business is
+configured as not VAT-registered; otherwise catalog prices are not assumed VAT-inclusive.
 No customer confirmation, new draft creation or automatic repricing is performed
 by retrieval itself. Production selection rules should be reviewed with Roland
 before enabling the customer reorder workflow.
@@ -63,8 +64,9 @@ sequenceDiagram
 
 `update_draft_invoice` takes the **complete desired line list**. Omitted lines
 are removed; it is not a partial patch. Lines use the same schema as
-`create_invoice`: explicit inclusive rate, positive quantity, item_id or
-description, and configured tax_id or explicitly approved no_tax. Existing
+`create_invoice`: explicit final rate, positive quantity, item_id or
+description, and no tax when not VAT-registered (otherwise a configured tax_id
+or explicitly approved no_tax). Existing
 invoice date and due date are preserved. Header charges and discounts are not
 changed, so the displayed line subtotal is not necessarily the final total.
 Drafts with line discounts are rejected until discount-preserving edits are

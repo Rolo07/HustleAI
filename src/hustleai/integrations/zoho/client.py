@@ -99,6 +99,18 @@ class Client:
                      'X-com-zoho-invoice-organizationid': self.organization}))
 
 class API(Client):
+    def __init__(self, organization, pdf_dir=None):
+        """Authenticate and choose the one private folder for downloaded PDFs.
+
+        Args:
+            organization: Zoho Invoice organization ID.
+            pdf_dir: Folder for invoice PDFs. Service passes its own folder so
+                downloads and review copies always share one location. Defaults
+                to invoice-pdfs under the configured data directory.
+        """
+        super().__init__(organization)
+        self.pdf_dir = Path(pdf_dir) if pdf_dir else ROOT / 'invoice-pdfs'
+
     def post(self, path, payload):
         """Submit one JSON mutation to the configured Zoho organization.
 
@@ -175,7 +187,7 @@ class API(Client):
             invoice_id: Numeric Zoho invoice identifier.
 
         Returns:
-            Absolute path to invoice-pdfs/<invoice_id>.pdf under the module root.
+            Absolute path to <invoice_id>.pdf inside pdf_dir.
 
         Raises:
             ValueError: The ID is invalid or the response lacks the PDF signature.
@@ -195,9 +207,8 @@ class API(Client):
             data = response.read()
         if not data.startswith(b'%PDF-'):
             raise ValueError('Zoho did not return a PDF.')
-        folder = ROOT / 'invoice-pdfs'
-        folder.mkdir(mode=0o700, exist_ok=True)
-        path = folder / (identifier(invoice_id) + '.pdf')
+        self.pdf_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path = self.pdf_dir / (identifier(invoice_id) + '.pdf')
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, 'wb') as output:
             output.write(data)

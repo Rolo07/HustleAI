@@ -35,8 +35,9 @@ def list_products() -> list:
     Raises:
         ValueError: OAuth/API requests fail or the GET budget is exhausted.
 
-    Includes inactive items; choose an active item for invoices. Confirm that
-    the proposed rate is VAT-inclusive rather than assuming catalog pricing.
+    Includes inactive items; choose an active item for invoices. If the
+    business is VAT-registered, confirm the proposed rate is VAT-inclusive
+    rather than assuming catalog pricing. If it is not, rates are final prices.
     This tool performs no remote writes.
     """
     with Service() as s:
@@ -54,8 +55,9 @@ def list_taxes() -> dict:
     Raises:
         ValueError: OAuth or the API read fails.
 
-    An empty taxes list is not permission to invent a VAT rate or omit tax.
-    Ask Roland for treatment when tax settings are missing.
+    An empty taxes list is not permission to invent a VAT rate. When the
+    business is configured as not VAT-registered, invoices never carry tax
+    and this list is not used.
     """
     with Service() as s:
         return s.api.get('settings/taxes')
@@ -91,10 +93,11 @@ def create_invoice(cellphone: str, lines: list[dict], invoice_date: str, contact
 
     Args:
         cellphone: Customer's cellphone.
-        lines: 1–100 dictionaries with explicit VAT-inclusive rate, positive
-            quantity (default 1), item_id or description, and tax_id (may
-            inherit the product's tax). Use no_tax=True only after Roland
-            explicitly approves it; never infer approval from missing setup.
+        lines: 1–100 dictionaries with an explicit final rate, positive
+            quantity (default 1), and item_id or description. If the business
+            is configured as not VAT-registered, omit tax_id and no_tax; no
+            VAT is shown. If that setting is absent, each line needs a tax_id
+            (may inherit the product's tax) or no_tax=True approved by Roland.
         invoice_date: Invoice date in YYYY-MM-DD format.
         contact_id: Optional client ID to resolve a shared cellphone.
 
@@ -321,6 +324,62 @@ def validate_invoice_approval(approval_id: str) -> dict:
         return s.check_approval(approval_id)
     finally:
         s.close()
+
+
+@mcp.tool()
+def reorder_forecast(refresh: bool = False) -> dict:
+    """Show customers expected to reorder 7-14 days from now, for planning.
+
+    Args:
+        refresh: Rebuild from Zoho instead of reusing this week's saved report.
+    Returns: {report: ..., markdown: ...}. The report lists due customers,
+        stock quantities, delivery areas, overdue customers, customers
+        without enough history and an estimated value.
+    Raises: ValueError if Zoho reads fail or the request budget is reached.
+
+    Read-only in Zoho. Predictions average each customer's last three order
+    dates unless Roland set a cycle. Estimates use past invoices, not current
+    prices. For Roland only; never share the report with customers.
+    """
+    from hustleai.workflows.forecast import render_markdown
+    with Service() as s:
+        report = s.reorder_forecast(refresh)
+    return {'report': report, 'markdown': render_markdown(report)}
+
+
+@mcp.tool()
+def set_reorder_cycle(cellphone: str, cycle_days: int, contact_id: str = '') -> dict:
+    """Set how often a customer reorders, replacing the history-based guess.
+
+    Args:
+        cellphone: Customer's cellphone.
+        cycle_days: Whole days between orders, 1 to 365.
+        contact_id: Optional client ID for a shared number.
+    Returns: Saved setting. Also includes an excluded customer again.
+    Raises: ValueError for invalid days or an ambiguous customer.
+
+    Changes only the forecast settings; Zoho is not changed. Act only on
+    Roland's instruction.
+    """
+    with Service() as s:
+        return s.set_order_cycle(cellphone, cycle_days, contact_id)
+
+
+@mcp.tool()
+def exclude_from_forecast(cellphone: str, exclude: bool = True, contact_id: str = '') -> dict:
+    """Exclude a customer who stopped ordering from forecasts, or include them again.
+
+    Args:
+        cellphone: Customer's cellphone.
+        exclude: True to exclude, False to include again.
+        contact_id: Optional client ID for a shared number.
+    Returns: Saved setting. Any cycle set earlier is kept.
+    Raises: ValueError for an ambiguous or unknown customer.
+
+    Changes only the forecast settings; Zoho is not changed.
+    """
+    with Service() as s:
+        return s.exclude_from_forecast(cellphone, exclude, contact_id)
 
 
 def main():

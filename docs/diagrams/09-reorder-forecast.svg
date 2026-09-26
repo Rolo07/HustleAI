@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1568" role="img" aria-labelledby="title desc">
+<title id="title">Weekly reorder forecast</title><desc id="desc">Directed workflow diagram. Follow arrows and branch labels. Decisions have amber borders; Roland actions are purple; exceptions are red.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="580.0,122 580.0,192" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="723,235.0 814,235.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="751.25" y="210.0" width="34.5" height="24" rx="6" fill="white"/><text x="768.5" y="226.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,278 580.0,348" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="563.0" y="301.0" width="34" height="24" rx="6" fill="white"/><text x="580.0" y="317.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,434 580.0,504" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="437,547.0 346,547.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="374.25" y="522.0" width="34.5" height="24" rx="6" fill="white"/><text x="391.5" y="538.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,590 580.0,660" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="563.0" y="613.0" width="34" height="24" rx="6" fill="white"/><text x="580.0" y="629.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="723,703.0 814,703.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="751.25" y="678.0" width="34.5" height="24" rx="6" fill="white"/><text x="768.5" y="694.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,746 580.0,816" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="563.0" y="769.0" width="34" height="24" rx="6" fill="white"/><text x="580.0" y="785.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="437,859.0 346,859.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="374.5" y="834.0" width="34" height="24" rx="6" fill="white"/><text x="391.5" y="850.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,902 580.0,972" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="562.75" y="925.0" width="34.5" height="24" rx="6" fill="white"/><text x="580.0" y="941.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="1100,703.0 1140,703.0 1140,1015.0 723,1015.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="437,1015.0 346,1015.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="359.25" y="990.0" width="64.5" height="24" rx="6" fill="white"/><text x="391.5" y="1006.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Overdue</text>
+<polyline points="580.0,1058 580.0,1128" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="529.0" y="1081.0" width="102.0" height="24" rx="6" fill="white"/><text x="580.0" y="1097.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">In 7–14 days</text>
+<polyline points="580.0,1214 580.0,1284" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="60,1015.0 20,1015.0 20,1327.0 437,1327.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="580.0,1370 580.0,1440" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g><title>Monday 07:00 SA time: Weekly timer, or Roland asks Hermes</title><rect x="437" y="36" width="286" height="86" rx="12" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.3"/>
+<text x="580.0" y="67" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Monday 07:00 SA time</text>
+<text x="580.0" y="96" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Weekly timer, or Roland asks Hermes</text>
+</g>
+<g><title>Report saved this week?: Rebuild only when refresh is asked</title><rect x="437" y="192" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Report saved this week?</text>
+<text x="580.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Rebuild only when refresh is asked</text>
+</g>
+<g><title>Return saved report: No Zoho requests</title><rect x="814" y="192" width="286" height="86" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="1.3"/>
+<text x="957.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Return saved report</text>
+<text x="957.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">No Zoho requests</text>
+</g>
+<g><title>Read Zoho invoice history: Real orders only: no drafts, voids or tests</title><rect x="437" y="348" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Read Zoho invoice history</text>
+<text x="580.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Real orders only: no drafts, voids or</text>
+<text x="580.0" y="423" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">tests</text>
+</g>
+<g><title>Excluded by Roland?: Checked for each customer</title><rect x="437" y="504" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Excluded by Roland?</text>
+<text x="580.0" y="564" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Checked for each customer</text>
+</g>
+<g><title>Skip customer: Counted as excluded in the report</title><rect x="60" y="504" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="203.0" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Skip customer</text>
+<text x="203.0" y="564" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Counted as excluded in the report</text>
+</g>
+<g><title>Cycle set by Roland?: Otherwise use order history</title><rect x="437" y="660" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="691" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Cycle set by Roland?</text>
+<text x="580.0" y="720" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Otherwise use order history</text>
+</g>
+<g><title>Use Roland’s cycle: Last order date plus cycle days</title><rect x="814" y="660" width="286" height="86" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.3"/>
+<text x="957.0" y="691" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Use Roland’s cycle</text>
+<text x="957.0" y="720" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Last order date plus cycle days</text>
+</g>
+<g><title>Two or more orders?: Average gap of the last 3 orders</title><rect x="437" y="816" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Two or more orders?</text>
+<text x="580.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Average gap of the last 3 orders</text>
+</g>
+<g><title>Unable to predict: Listed so Roland can set a cycle</title><rect x="60" y="816" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="203.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Unable to predict</text>
+<text x="203.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Listed so Roland can set a cycle</text>
+</g>
+<g><title>When is the next order?: Customers due later are not listed</title><rect x="437" y="972" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="1003" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">When is the next order?</text>
+<text x="580.0" y="1032" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Customers due later are not listed</text>
+</g>
+<g><title>Overdue list: Expected date passed, no newer order</title><rect x="60" y="972" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="203.0" y="1003" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Overdue list</text>
+<text x="203.0" y="1032" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Expected date passed, no newer order</text>
+</g>
+<g><title>Recheck orders used: Drop hidden test orders; predict again</title><rect x="437" y="1128" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="1159" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Recheck orders used</text>
+<text x="580.0" y="1188" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Drop hidden test orders; predict again</text>
+</g>
+<g><title>Save the weekly report: Customers, stock, areas and value</title><rect x="437" y="1284" width="286" height="86" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="1.3"/>
+<text x="580.0" y="1315" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Save the weekly report</text>
+<text x="580.0" y="1344" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Customers, stock, areas and value</text>
+</g>
+<g><title>Roland plans the week: Private file, command or Hermes</title><rect x="437" y="1440" width="286" height="86" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.3"/>
+<text x="580.0" y="1471" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Roland plans the week</text>
+<text x="580.0" y="1500" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Private file, command or Hermes</text>
+</g>
+</svg>

@@ -35,6 +35,33 @@ def fingerprint(invoice):
                                     ensure_ascii=False, allow_nan=False).encode()).hexdigest()
 
 
+ORDER_STATUSES = ('sent', 'overdue', 'paid', 'partially_paid', 'unpaid')
+
+
+def eligible_order(invoice, excluded_ids=()):
+    """Return True if an invoice counts as a real customer order.
+
+    Args:
+        invoice: Zoho invoice summary or full invoice dictionary.
+        excluded_ids: Configured test invoice IDs to ignore.
+    Returns:
+        False for drafts, voids, unissued statuses, configured test IDs and
+        explicit TEST markers in the reference, notes, number or line text.
+
+    Shared by reorder retrieval and the weekly forecast so both use one rule.
+    A summary lacks notes and line items; callers that need the full marker
+    check must repeat it on the full invoice.
+    """
+    if str(invoice.get('invoice_id')) in set(map(str, excluded_ids)):
+        return False
+    if invoice.get('status') not in ORDER_STATUSES:
+        return False
+    text = ' '.join(str(invoice.get(k, '')) for k in ('reference_number', 'notes', 'invoice_number'))
+    text += ' ' + ' '.join(str(line.get(k, '')) for line in invoice.get('line_items', [])
+                          for k in ('name', 'description'))
+    return not re.search(r'\bTEST(?:\b|[_-])', text, re.I)
+
+
 class InvoiceWorkflows:
     """Mixin using Service's API, organization-scoped journal and phone lookup."""
 
@@ -109,12 +136,7 @@ class InvoiceWorkflows:
             if iid in excluded or summary.get('status') in ('void', 'voided', 'draft'):
                 continue
             inv = self.invoice(phone, iid, str(customer['contact_id']))
-            if inv.get('status') not in ('sent', 'overdue', 'paid', 'partially_paid', 'unpaid'):
-                continue
-            text = ' '.join(str(inv.get(k, '')) for k in ('reference_number', 'notes', 'invoice_number'))
-            text += ' ' + ' '.join(str(line.get(k, '')) for line in inv.get('line_items', [])
-                                  for k in ('name', 'description'))
-            if re.search(r'\bTEST(?:\b|[_-])', text, re.I):
+            if not eligible_order(inv, excluded):
                 continue
             candidates.append((date.fromisoformat(inv['date']), inv))
         if not candidates:
@@ -135,9 +157,10 @@ class InvoiceWorkflows:
             else:
                 if item.get('status') != 'active':
                     line_issues.append('Product is not active.')
-                if not item.get('tax_id'):
-                    line_issues.append('No configured product tax; resolve tax treatment explicitly.')
-                line_issues.append('Confirm whether catalog rate includes VAT before using it.')
+                if config.get('vat_registered') is not False:
+                    if not item.get('tax_id'):
+                        line_issues.append('No configured product tax; resolve tax treatment explicitly.')
+                    line_issues.append('Confirm whether catalog rate includes VAT before using it.')
             if line.get('discount') or line.get('discount_amount'):
                 line_issues.append('Historical discount requires explicit review.')
             lines.append({'previous_line': line, 'current_product': item, 'review_required': line_issues})
@@ -207,7 +230,7 @@ class InvoiceWorkflows:
                 self.invalidate_reviews(invoice_id)
                 raise ValueError('Invoice changed during PDF generation; request a new review.')
             review_id = uuid.uuid4().hex
-            directory = self.root / 'invoice-pdfs' / 'reviews'
+            directory = self.pdf_dir / 'reviews'
             directory.mkdir(mode=0o700, parents=True, exist_ok=True)
             path = directory / f'{review_id}.pdf'
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
