@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hustleai"
+version = "0.1.0"
+description = "Owner-controlled Zoho workflows and Hermes MCP tools"
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.12,<2", "certifi"]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2,<4"]
+
+[project.scripts]
+hustleai-mcp = "hustleai.mcp.owner_server:main"
+hustleai-contacts = "hustleai.cli.contacts:run"
+hustleai-zoho-setup = "hustleai.cli.setup:run"
+hustleai-zoho-upgrade = "hustleai.cli.upgrade:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]

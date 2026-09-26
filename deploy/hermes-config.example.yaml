@@ -1,0 +1,8 @@
+# Merge into ~/.hermes/config.yaml after installing this project on the VPS.
+# Replace paths. This toolset is OWNER ONLY; do not expose it to customer agents.
+mcp_servers:
+  zoho_invoice:
+    command: /opt/hustleai/.venv/bin/python
+    args: ["-m", "hustleai.mcp.owner_server"]
+    env:
+      HUSTLEAI_DATA_DIR: /var/lib/hustleai

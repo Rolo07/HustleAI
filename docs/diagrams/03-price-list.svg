@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1100" role="img" aria-labelledby="title desc">
+<title id="title">Automatic price-list delivery</title><desc id="desc">Directed workflow diagram. Follow arrows and branch labels. Decisions have amber borders; Roland actions are purple; exceptions are red.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="580.0,122 580.0,192" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="437,235.0 346,235.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="374.5" y="210.0" width="34" height="24" rx="6" fill="white"/><text x="391.5" y="226.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,278 580.0,348" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="562.75" y="301.0" width="34.5" height="24" rx="6" fill="white"/><text x="580.0" y="317.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,434 580.0,504" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="723,547.0 814,547.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="751.5" y="522.0" width="34" height="24" rx="6" fill="white"/><text x="768.5" y="538.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,590 580.0,660" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="562.75" y="613.0" width="34.5" height="24" rx="6" fill="white"/><text x="580.0" y="629.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,746 580.0,816" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="580.0,902 580.0,972" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<g><title>Customer asks for prices: New or existing customer</title><rect x="437" y="36" width="286" height="86" rx="12" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.3"/>
+<text x="580.0" y="67" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Customer asks for prices</text>
+<text x="580.0" y="96" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">New or existing customer</text>
+</g>
+<g><title>Approved PDF available?: Configured VPS path; valid PDF</title><rect x="437" y="192" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Approved PDF available?</text>
+<text x="580.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Configured VPS path; valid PDF</text>
+</g>
+<g><title>Refer to Roland: Do not invent a replacement</title><rect x="60" y="192" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="203.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Refer to Roland</text>
+<text x="203.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Do not invent a replacement</text>
+</g>
+<g><title>Send PDF to requester: No per-request owner approval</title><rect x="437" y="348" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Send PDF to requester</text>
+<text x="580.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">No per-request owner approval</text>
+</g>
+<g><title>Request accepted?: Store provider message ID</title><rect x="437" y="504" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Request accepted?</text>
+<text x="580.0" y="564" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Store provider message ID</text>
+</g>
+<g><title>Record failure and refer: Do not claim success</title><rect x="814" y="504" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="957.0" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Record failure and refer</text>
+<text x="957.0" y="564" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Do not claim success</text>
+</g>
+<g><title>Track delivery receipt: Accepted is not delivered</title><rect x="437" y="660" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="691" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Track delivery receipt</text>
+<text x="580.0" y="720" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Accepted is not delivered</text>
+</g>
+<g><title>Record final outcome: File version and recipient</title><rect x="437" y="816" width="286" height="86" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="1.3"/>
+<text x="580.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Record final outcome</text>
+<text x="580.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">File version and recipient</text>
+</g>
+<g><title>Include in daily summary: Separate successes and failures</title><rect x="437" y="972" width="286" height="86" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="1.3"/>
+<text x="580.0" y="1003" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Include in daily summary</text>
+<text x="580.0" y="1032" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Separate successes and failures</text>
+</g>
+</svg>

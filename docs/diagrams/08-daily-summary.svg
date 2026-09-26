@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1100" role="img" aria-labelledby="title desc">
+<title id="title">Daily summary · 20:00 SA time</title><desc id="desc">Directed workflow diagram. Follow arrows and branch labels. Decisions have amber borders; Roland actions are purple; exceptions are red.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="580.0,122 580.0,192" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="580.0,278 580.0,348" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="437,391.0 346,391.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="374.25" y="366.0" width="34.5" height="24" rx="6" fill="white"/><text x="391.5" y="382.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,434 580.0,504" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="563.0" y="457.0" width="34" height="24" rx="6" fill="white"/><text x="580.0" y="473.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,590 580.0,660" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="580.0,746 580.0,816" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="723,859.0 814,859.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="751.5" y="834.0" width="34" height="24" rx="6" fill="white"/><text x="768.5" y="850.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,902 580.0,972" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="562.75" y="925.0" width="34.5" height="24" rx="6" fill="white"/><text x="580.0" y="941.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<g><title>Collect durable activity events: Not model recollection</title><rect x="437" y="36" width="286" height="86" rx="12" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.3"/>
+<text x="580.0" y="61" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Collect durable activity</text>
+<text x="580.0" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">events</text>
+<text x="580.0" y="96" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Not model recollection</text>
+</g>
+<g><title>20:00 South African time: Use a defined reporting cutoff</title><rect x="437" y="192" width="286" height="86" rx="12" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.3"/>
+<text x="580.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">20:00 South African time</text>
+<text x="580.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Use a defined reporting cutoff</text>
+</g>
+<g><title>Report already completed?: One logical report per cutoff</title><rect x="437" y="348" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Report already completed?</text>
+<text x="580.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">One logical report per cutoff</text>
+</g>
+<g><title>Do not duplicate: Reuse recorded outcome</title><rect x="60" y="348" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="203.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Do not duplicate</text>
+<text x="203.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Reuse recorded outcome</text>
+</g>
+<g><title>Build and save report: Include period activity and pending work</title><rect x="437" y="504" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Build and save report</text>
+<text x="580.0" y="564" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Include period activity and pending work</text>
+</g>
+<g><title>Send privately to Roland: Use permitted WhatsApp mechanism</title><rect x="437" y="660" width="286" height="86" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.3"/>
+<text x="580.0" y="691" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Send privately to Roland</text>
+<text x="580.0" y="720" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Use permitted WhatsApp mechanism</text>
+</g>
+<g><title>Delivery confirmed?: Persist provider message ID</title><rect x="437" y="816" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Delivery confirmed?</text>
+<text x="580.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Persist provider message ID</text>
+</g>
+<g><title>Reconcile or retry: Keep the same report and period</title><rect x="814" y="816" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="957.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Reconcile or retry</text>
+<text x="957.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Keep the same report and period</text>
+</g>
+<g><title>Record completion: Recover missing cutoffs after restart</title><rect x="437" y="972" width="286" height="86" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="1.3"/>
+<text x="580.0" y="1003" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Record completion</text>
+<text x="580.0" y="1032" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Recover missing cutoffs after restart</text>
+</g>
+</svg>

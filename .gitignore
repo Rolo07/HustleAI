@@ -1,0 +1,29 @@
+.zoho-credentials.json
+.zoho-setup-*
+zoho-client-phone-map.md
+__pycache__/
+.env
+.zoho-local.json
+.zoho-local-*
+.venv/
+.zoho-operations.sqlite3*
+invoice-pdfs/
+
+.zoho-locks/
+
+# Build output and private runtime storage
+*.egg-info/
+build/
+dist/
+var/
+.env.*
+!.env.example
+.supabase-credentials.json
+.supabase-setup-*
+
+# Hosted runtime secrets and private migration snapshots
+.supabase-runtime.json
+backups/
+
+.supabase-migration.lock
+.storage-maintenance

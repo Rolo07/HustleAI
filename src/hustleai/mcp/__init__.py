@@ -1,0 +1,1 @@
+"""HustleAI mcp package."""

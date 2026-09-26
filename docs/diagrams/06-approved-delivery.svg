@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1100" role="img" aria-labelledby="title desc">
+<title id="title">Approved customer delivery</title><desc id="desc">Directed workflow diagram. Follow arrows and branch labels. Decisions have amber borders; Roland actions are purple; exceptions are red.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="580.0,122 580.0,192" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="437,235.0 346,235.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="374.5" y="210.0" width="34" height="24" rx="6" fill="white"/><text x="391.5" y="226.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">No</text>
+<polyline points="580.0,278 580.0,348" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="562.75" y="301.0" width="34.5" height="24" rx="6" fill="white"/><text x="580.0" y="317.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="580.0,434 580.0,504" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="580.0,590 580.0,660" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<polyline points="723,703.0 814,703.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="736.25" y="678.0" width="64.5" height="24" rx="6" fill="white"/><text x="768.5" y="694.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Not yet</text>
+<polyline points="580.0,746 580.0,816" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="562.75" y="769.0" width="34.5" height="24" rx="6" fill="white"/><text x="580.0" y="785.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Yes</text>
+<polyline points="723,859.0 814,859.0" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="736.25" y="834.0" width="64.5" height="24" rx="6" fill="white"/><text x="768.5" y="850.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Failure</text>
+<polyline points="580.0,902 580.0,972" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="547.75" y="925.0" width="64.5" height="24" rx="6" fill="white"/><text x="580.0" y="941.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#334155">Success</text>
+<g><title>Owner approves version: Invoice, content and recipient bound</title><rect x="437" y="36" width="286" height="86" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.3"/>
+<text x="580.0" y="67" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Owner approves version</text>
+<text x="580.0" y="96" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Invoice, content and recipient bound</text>
+</g>
+<g><title>Approval still valid?: Verify current invoice and customer</title><rect x="437" y="192" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Approval still valid?</text>
+<text x="580.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Verify current invoice and customer</text>
+</g>
+<g><title>Return to owner review: Stale content or destination</title><rect x="60" y="192" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="203.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Return to owner review</text>
+<text x="203.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Stale content or destination</text>
+</g>
+<g><title>Send customer the PDF: Business WhatsApp conversation</title><rect x="437" y="348" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Send customer the PDF</text>
+<text x="580.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Business WhatsApp conversation</text>
+</g>
+<g><title>Store message ID: API acceptance: still unsent in Zoho</title><rect x="437" y="504" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="535" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Store message ID</text>
+<text x="580.0" y="564" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">API acceptance: still unsent in Zoho</text>
+</g>
+<g><title>Customer delivery verified?: Receipt matches this message</title><rect x="437" y="660" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+<text x="580.0" y="691" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Customer delivery verified?</text>
+<text x="580.0" y="720" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Receipt matches this message</text>
+</g>
+<g><title>Pending or failed: Reconcile; notify Roland if failed</title><rect x="814" y="660" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="957.0" y="691" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Pending or failed</text>
+<text x="957.0" y="720" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Reconcile; notify Roland if failed</text>
+</g>
+<g><title>Mark sent in Zoho: Do not send the PDF again</title><rect x="437" y="816" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Mark sent in Zoho</text>
+<text x="580.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Do not send the PDF again</text>
+</g>
+<g><title>Zoho update failed: Retry status update only</title><rect x="814" y="816" width="286" height="86" rx="12" fill="#fff1f2" stroke="#be123c" stroke-width="1.3"/>
+<text x="957.0" y="847" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Zoho update failed</text>
+<text x="957.0" y="876" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Retry status update only</text>
+</g>
+<g><title>Record completion: Report outcome to Roland</title><rect x="437" y="972" width="286" height="86" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="1.3"/>
+<text x="580.0" y="1003" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Record completion</text>
+<text x="580.0" y="1032" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Report outcome to Roland</text>
+</g>
+</svg>
