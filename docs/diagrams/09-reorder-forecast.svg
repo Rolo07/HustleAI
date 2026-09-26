@@ -40,9 +40,9 @@
 <text x="957.0" y="223" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Return saved report</text>
 <text x="957.0" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">No Zoho requests</text>
 </g>
-<g><title>Read Zoho invoice history: Orders since VPS go-live; no drafts, voids or tests</title><rect x="437" y="348" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
-<text x="580.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Read Zoho invoice history</text>
-<text x="580.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Orders since VPS go-live; no drafts,</text>
+<g><title>Read synced orders: Supabase copy since go-live; no drafts, voids or tests</title><rect x="437" y="348" width="286" height="86" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.3"/>
+<text x="580.0" y="379" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#0f172a">Read synced orders</text>
+<text x="580.0" y="408" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">Supabase copy since go-live; no drafts,</text>
 <text x="580.0" y="423" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#334155">voids or tests</text>
 </g>
 <g><title>Excluded by Roland?: Checked for each customer</title><rect x="437" y="504" width="286" height="86" rx="22" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>

@@ -20,7 +20,7 @@ class WorkflowRepository:
     def table(self, name):
         """Return a qualified internal table name (never accepts external input)."""
         if name not in ('operations', 'invoice_reviews', 'invoice_approvals', 'phone_mappings',
-                        'customer_order_cycles', 'reorder_forecasts'):
+                        'customer_order_cycles', 'reorder_forecasts', 'orders', 'sync_runs'):
             raise ValueError('Unknown storage table.')
         return self.prefix + name
 
@@ -212,6 +212,96 @@ class WorkflowRepository:
         if row is None:
             return None
         return json.loads(row[0]) if isinstance(row[0], str) else row[0]
+
+    ORDER_COLUMNS = ('invoice_id', 'customer_id', 'customer_name', 'invoice_number', 'reference_number',
+                     'invoice_date', 'status', 'total', 'last_modified_time', 'notes', 'line_items')
+
+    def save_order(self, order, details_synced, source):
+        """Insert or replace one invoice copy; see save_orders."""
+        self.save_orders([(order, details_synced)], source)
+
+    def save_orders(self, orders, source):
+        """Insert or replace invoice copies in one transaction.
+
+        orders is a list of (order, details_synced) pairs. Each order holds
+        ORDER_COLUMNS with invoice_date as a date and line_items as a list or
+        None. A summary-only save clears old details so they are fetched again.
+        A saved order is never marked deleted.
+        """
+        if not orders:
+            return
+        columns = self.ORDER_COLUMNS + ('details_synced', 'deleted', 'source')
+        rows = [[self.organization] + [self.encode_date(order[c]) if c == 'invoice_date'
+                 else self.encode_json(order[c]) if c == 'line_items' and order[c] is not None
+                 else order[c] for c in self.ORDER_COLUMNS] + [bool(details), False, source]
+                for order, details in orders]
+        updates = ','.join(f'{c}=excluded.{c}' for c in columns[1:])
+        with self.transaction():
+            self.connection.cursor().executemany(
+                f"""INSERT INTO {self.table('orders')} ({self.org_column},{','.join(columns)},updated_at)
+                VALUES ({','.join([self.param] * (len(columns) + 1))},CURRENT_TIMESTAMP)
+                ON CONFLICT ({self.org_column},invoice_id) DO UPDATE SET {updates},updated_at=CURRENT_TIMESTAMP""",
+                rows)
+
+    def order_index(self):
+        """Return {invoice_id: {last_modified_time, deleted}} for change detection."""
+        rows = self.connection.execute(
+            f"SELECT invoice_id,last_modified_time,deleted FROM {self.table('orders')} WHERE {self.org_column}={self.param}",
+            (self.organization,)).fetchall()
+        return {str(iid): {'last_modified_time': modified, 'deleted': bool(deleted)} for iid, modified, deleted in rows}
+
+    def mark_orders_deleted(self, invoice_ids):
+        """Flag invoices that a complete Zoho listing no longer contains."""
+        if not invoice_ids:
+            return
+        with self.transaction():
+            self.connection.cursor().executemany(
+                f"UPDATE {self.table('orders')} SET deleted={self.param},updated_at=CURRENT_TIMESTAMP WHERE {self.org_column}={self.param} AND invoice_id={self.param}",
+                [(True, self.organization, str(invoice_id)) for invoice_id in invoice_ids])
+
+    def orders(self):
+        """Return all non-deleted invoice copies as dictionaries, newest first."""
+        cursor = self.connection.execute(
+            f"SELECT {','.join(self.ORDER_COLUMNS)},details_synced FROM {self.table('orders')} "
+            f"WHERE {self.org_column}={self.param} AND deleted={self.param} ORDER BY invoice_date DESC,invoice_id",
+            (self.organization, False))
+        names = self.ORDER_COLUMNS + ('details_synced',)
+        result = []
+        for row in cursor.fetchall():
+            order = dict(zip(names, row))
+            order['invoice_date'] = str(order['invoice_date'])
+            order['details_synced'] = bool(order['details_synced'])
+            if isinstance(order['line_items'], str):
+                order['line_items'] = json.loads(order['line_items'])
+            result.append(order)
+        return result
+
+    def orders_missing_details(self):
+        """Return invoice IDs still needing a detail read, newest first."""
+        return [str(row[0]) for row in self.connection.execute(
+            f"SELECT invoice_id FROM {self.table('orders')} WHERE {self.org_column}={self.param} "
+            f"AND deleted={self.param} AND details_synced={self.param} ORDER BY invoice_date DESC,invoice_id",
+            (self.organization, False, False)).fetchall()]
+
+    def record_sync(self, name, started, finished, result):
+        """Save the latest completed run of a sync job."""
+        with self.transaction():
+            self.connection.execute(
+                f"""INSERT INTO {self.table('sync_runs')} ({self.org_column},name,started_at,finished_at,result)
+                VALUES ({self.param},{self.param},{self.param},{self.param},{self.param})
+                ON CONFLICT ({self.org_column},name) DO UPDATE SET started_at=excluded.started_at,
+                finished_at=excluded.finished_at, result=excluded.result""",
+                (self.organization, name, self.encode_time(started), self.encode_time(finished), self.encode_json(result)))
+
+    def last_sync(self, name):
+        """Return {started, finished, result} for a sync job, or None if it never ran."""
+        row = self.connection.execute(
+            f"SELECT started_at,finished_at,result FROM {self.table('sync_runs')} WHERE {self.org_column}={self.param} AND name={self.param}",
+            (self.organization, name)).fetchone()
+        if row is None:
+            return None
+        result = json.loads(row[2]) if isinstance(row[2], str) else row[2]
+        return {'started': self.decode_time(row[0]), 'finished': self.decode_time(row[1]), 'result': result}
 
     def close(self):
         """Release the connection; callers must use finally or a context manager."""

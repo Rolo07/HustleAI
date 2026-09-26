@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from hustleai.domain.phones import normalize
 from hustleai.domain.validation import identifier
 from hustleai.workflows.invoice_review import eligible_order
+from hustleai.workflows.orders import as_invoice
 
 TIMEZONE = ZoneInfo('Africa/Johannesburg')
 LEAD_DAYS = 7          # Report starts this many days after the run date.
@@ -171,7 +172,10 @@ def render_markdown(report):
              f"Run on {report['run_date']} ({report['timezone']}). Predictions use each customer's "
              f"last {HISTORY_ORDERS} orders unless you set a cycle for them.",
              (f"Only orders from {report['tracking_since']} onward are counted." if report.get('tracking_since')
-              else 'All order history is counted; no tracking start date is set.'), '']
+              else 'All order history is counted; no tracking start date is set.'),
+             (f"Orders last synced from Zoho at {report['orders_synced_at']} (UTC)."
+              + (' Warning: the sync is more than two days old.' if report.get('orders_sync_stale') else '')
+              if report.get('orders_synced_at') else ''), '']
     due = report['due']
     lines += [f'## Expected to order ({len(due)})', '']
     if due:
@@ -249,18 +253,21 @@ class ForecastWorkflows:
         return self.build_forecast(today)
 
     def build_forecast(self, today=None):
-        """Build the forecast from Zoho invoices and save it for this run date.
+        """Build the forecast from the synced orders copy and save it.
 
-        Reads one paged list of all invoices, then full invoices and contact
-        details only for customers who are due or overdue. Customers Roland
-        excluded are skipped. Writes only the saved report in storage.
+        Reads orders from storage, not Zoho. Zoho is read only for contact
+        details of due or overdue customers, and for any order whose details
+        the nightly sync has not fetched yet. Customers Roland excluded are
+        skipped. Raises ValueError if orders were never synced.
         """
         today = today or local_today()
+        synced_at, stale, _ = self.orders_freshness()
         excluded_ids = set(map(str, self.workflow_config.get('test_invoice_ids', [])))
         tracking = tracking_start(self.workflow_config)
         settings = self.store.order_cycles()
         by_customer = defaultdict(list)
-        for summary in self.api.pages('invoices', 'invoices'):
+        for order in self.store.orders():
+            summary = as_invoice(order)
             day = date.fromisoformat(summary['date'])
             if eligible_order(summary, excluded_ids) and day <= today and (tracking is None or day >= tracking):
                 by_customer[str(summary['customer_id'])].append(summary)
@@ -306,6 +313,7 @@ class ForecastWorkflows:
         end = start + timedelta(days=WINDOW_DAYS)
         report = {'run_date': today.isoformat(), 'window_start': start.isoformat(), 'window_end': end.isoformat(),
                   'timezone': str(TIMEZONE), 'tracking_since': tracking.isoformat() if tracking else None,
+                  'orders_synced_at': synced_at, 'orders_sync_stale': stale,
                   'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
                   'due': due, 'products': total_products(due), 'areas': group_by_area(due),
                   'overdue': overdue, 'unpredictable': unpredictable,
@@ -321,6 +329,7 @@ class ForecastWorkflows:
         Returns ('unpredictable', last_order_date, []), (status, prediction,
         full_invoices) for due/overdue customers, or None. A used invoice that
         fails the full TEST-marker check is dropped and the prediction redone.
+        Orders whose details were not synced yet are read from Zoho and saved.
         """
         pool = list(summaries)
         checked = {}
@@ -337,7 +346,11 @@ class ForecastWorkflows:
             for summary in used:
                 invoice_id = identifier(summary['invoice_id'])
                 if invoice_id not in checked:
-                    full = self.api.get('invoices/' + invoice_id)['invoice']
+                    if 'line_items' in summary:
+                        full = summary
+                    else:
+                        full = self.api.get('invoices/' + invoice_id)['invoice']
+                        self.record_order(full, source='sync')
                     checked[invoice_id] = full if eligible_order(full, excluded_ids) else None
                 if checked[invoice_id] is None:
                     pool.remove(summary)

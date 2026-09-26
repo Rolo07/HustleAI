@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Mac: nightly orders sync at 22:00 in the Mac's timezone (set to South
+     Africa), before Zoho's daily request limit resets at midnight.
+     Install: cp to ~/Library/LaunchAgents/ and
+     launchctl load ~/Library/LaunchAgents/com.hustleai.orders-sync.plist
+     Remove when the VPS timer takes over. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hustleai.orders-sync</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rolandachary/Desktop/HustleAI/.venv/bin/hustleai-orders</string>
+        <string>sync</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>22</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/rolandachary/Desktop/HustleAI/reports/orders-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rolandachary/Desktop/HustleAI/reports/orders-sync.log</string>
+</dict>
+</plist>

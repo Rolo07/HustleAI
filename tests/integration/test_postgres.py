@@ -43,6 +43,8 @@ class PostgresTests(WorkflowTests):
                 # The forecast migration copies the operations policy above.
                 forecast = (Path(__file__).parents[2] / 'supabase/migrations/202609260003_reorder_forecast.sql').read_text()
                 cls.admin.execute(forecast.replace('hustle_private', cls.schema))
+                orders = (Path(__file__).parents[2] / 'supabase/migrations/202609270004_orders.sql').read_text()
+                cls.admin.execute(orders.replace('hustle_private', cls.schema))
         except BaseException:
             cls.admin.execute(sql.SQL('DROP SCHEMA IF EXISTS {} CASCADE').format(sql.Identifier(cls.schema)))
             cls.admin.close()
@@ -61,7 +63,7 @@ class PostgresTests(WorkflowTests):
         return PostgresRepository(ROOT, organization, db, self.schema)
 
     def setUp(self):
-        self.admin.execute(f'TRUNCATE {self.schema}.operations, {self.schema}.phone_mappings, {self.schema}.invoice_reviews, {self.schema}.invoice_approvals, {self.schema}.customer_order_cycles, {self.schema}.reorder_forecasts CASCADE')
+        self.admin.execute(f'TRUNCATE {self.schema}.operations, {self.schema}.phone_mappings, {self.schema}.invoice_reviews, {self.schema}.invoice_approvals, {self.schema}.customer_order_cycles, {self.schema}.reorder_forecasts, {self.schema}.orders, {self.schema}.sync_runs CASCADE')
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         config = self.root / 'config.json'
@@ -120,7 +122,7 @@ class PostgresTests(WorkflowTests):
             self.admin.execute(f'CREATE TABLE {schema}.schema_migrations (version text PRIMARY KEY, checksum text NOT NULL)')
             self.admin.execute(f'INSERT INTO {schema}.schema_migrations VALUES (%s,%s)', (initial.name, hashlib.sha256(initial.read_bytes()).hexdigest()))
             applied = apply_upgrades(self.admin, directory, schema)
-            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql'])
+            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql', '202609270004_orders.sql'])
             self.assertEqual(apply_upgrades(self.admin, directory, schema), [])
             with tempfile.TemporaryDirectory() as changed:
                 for path in directory.glob('*.sql'):
@@ -190,6 +192,43 @@ class PostgresTests(WorkflowTests):
             runtime.organization = '456'
             with self.assertRaises(errors.InsufficientPrivilege):
                 runtime.set_order_cycle('7', 14)
+        finally:
+            runtime.close()
+
+    def test_orders_copy_round_trip_and_isolation(self):
+        from datetime import date
+        from psycopg import errors
+        import time as clock
+        store = self.s.store
+        order = {'invoice_id': '77', 'customer_id': '1', 'customer_name': 'Customer', 'invoice_number': 'INV-77',
+                 'reference_number': '', 'invoice_date': date(2026, 10, 1), 'status': 'paid', 'total': '120.5',
+                 'last_modified_time': '2026-10-01T10:00:00+0200', 'notes': None, 'line_items': None}
+        store.save_order(order, False, 'sync')
+        self.assertEqual(store.orders_missing_details(), ['77'])
+        store.save_order(dict(order, notes='', line_items=[{'name': 'Honey', 'quantity': 2}]), True, 'app')
+        saved = store.orders()[0]
+        self.assertEqual((saved['invoice_date'], saved['total'], saved['line_items'], saved['details_synced']),
+                         ('2026-10-01', '120.5', [{'name': 'Honey', 'quantity': 2}], True))
+        self.assertEqual(store.order_index(), {'77': {'last_modified_time': '2026-10-01T10:00:00+0200', 'deleted': False}})
+        store.mark_orders_deleted(['77'])
+        self.assertEqual(store.orders(), [])
+        now = clock.time()
+        store.record_sync('orders', now - 5, now, {'listed': 1})
+        store.record_sync('orders', now - 2, now, {'listed': 2})
+        self.assertEqual(store.last_sync('orders')['result'], {'listed': 2})
+        other = self.repository('456')
+        try:
+            self.assertEqual((other.order_index(), other.last_sync('orders')), ({}, None))
+        finally:
+            other.close()
+        db = connect(ROOT)  # Restricted runtime login under the copied RLS policy.
+        runtime = PostgresRepository(ROOT, '123', db, self.schema)
+        try:
+            self.assertEqual(runtime.last_sync('orders')['result'], {'listed': 2})
+            runtime.save_order(dict(order, invoice_id='78'), False, 'sync')
+            runtime.organization = '456'
+            with self.assertRaises(errors.InsufficientPrivilege):
+                runtime.save_order(dict(order, invoice_id='79'), False, 'sync')
         finally:
             runtime.close()
 

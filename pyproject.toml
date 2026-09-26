@@ -16,6 +16,7 @@ postgres = ["psycopg[binary]>=3.2,<4"]
 hustleai-mcp = "hustleai.mcp.owner_server:main"
 hustleai-contacts = "hustleai.cli.contacts:run"
 hustleai-forecast = "hustleai.cli.forecast:run"
+hustleai-orders = "hustleai.cli.orders:run"
 hustleai-zoho-setup = "hustleai.cli.setup:run"
 hustleai-zoho-upgrade = "hustleai.cli.upgrade:run"
 

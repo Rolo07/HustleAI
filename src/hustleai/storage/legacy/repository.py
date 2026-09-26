@@ -37,6 +37,16 @@ class SQLiteRepository(WorkflowRepository):
         self.connection.execute('''CREATE TABLE IF NOT EXISTS reorder_forecasts (
             org TEXT NOT NULL, run_date TEXT NOT NULL, window_start TEXT, window_end TEXT,
             content TEXT NOT NULL, created_at TEXT, PRIMARY KEY (org, run_date))''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS orders (
+            org TEXT NOT NULL, invoice_id TEXT NOT NULL, customer_id TEXT NOT NULL,
+            customer_name TEXT, invoice_number TEXT, reference_number TEXT,
+            invoice_date TEXT NOT NULL, status TEXT NOT NULL, total TEXT,
+            last_modified_time TEXT, notes TEXT, line_items TEXT,
+            details_synced INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0,
+            source TEXT NOT NULL, updated_at TEXT, PRIMARY KEY (org, invoice_id))''')
+        self.connection.execute('''CREATE TABLE IF NOT EXISTS sync_runs (
+            org TEXT NOT NULL, name TEXT NOT NULL, started_at REAL, finished_at REAL,
+            result TEXT NOT NULL, PRIMARY KEY (org, name))''')
         self.connection.commit()
 
     @contextmanager

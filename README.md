@@ -115,6 +115,12 @@ value from past invoices. It is saved in Supabase and in the private `reports/`
 folder, which is excluded from Git. Schedule files for the Mac and the VPS are
 in `deploy/schedule/`; install only one.
 
+**Orders copy.** The forecast reads a Supabase copy of Zoho invoices, so it runs
+in seconds. Invoices the app creates or changes are copied immediately. Every
+night at 22:00, before Zoho's daily limit of 1,000 requests resets at midnight
+South African time, `hustleai-orders sync` compares all invoices, copies changes,
+flags deletions and reads missing details with the requests left over.
+
 ## Data and Supabase status
 
 Hosted Supabase PostgreSQL now stores the phone index and workflow state. The

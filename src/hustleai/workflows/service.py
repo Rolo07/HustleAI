@@ -16,9 +16,10 @@ from hustleai.workflows.invoices import InvoiceCreation
 from hustleai.workflows.payments import PaymentWorkflows
 from hustleai.workflows.invoice_review import InvoiceWorkflows
 from hustleai.workflows.forecast import ForecastWorkflows
+from hustleai.workflows.orders import OrderSync
 
 
-class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflows, ForecastWorkflows):
+class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflows, ForecastWorkflows, OrderSync):
     """Compose owner-side operations while retaining the existing Service API."""
 
     def __init__(self, api=None, root=ROOT):
@@ -152,4 +153,21 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
                 result = self.api.post(path, payload)
             mapping = (str(result['contact']['contact_id']), payload['contact_persons'][0]['mobile']) if kind == 'client' else None
             self.store.finish_operation(operation_id, result, mapping)
+        self.copy_order_after_write(kind, payload, result)
         return result
+
+    def copy_order_after_write(self, kind, payload, result):
+        """Update the orders copy right after a confirmed invoice or payment write.
+
+        Best-effort: the Zoho result is already saved, and the nightly sync
+        repairs any copy that fails here. A payment changes the invoice's
+        balance and status, so that invoice is read once and copied again.
+        """
+        if kind in ('invoice', 'draft_update') and isinstance(result.get('invoice'), dict):
+            self.record_order_quietly(result['invoice'])
+        elif kind == 'payment':
+            try:
+                invoice_id = payload['invoices'][0]['invoice_id']
+                self.record_order_quietly(self.api.get('invoices/' + invoice_id)['invoice'])
+            except Exception:
+                pass

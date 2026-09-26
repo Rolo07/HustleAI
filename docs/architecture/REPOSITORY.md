@@ -22,6 +22,7 @@ src/hustleai/
     payments.py                  Payment preparation and allocation validation
     invoice_review.py            Reorder history, revisions and version approval
     forecast.py                  Weekly reorder forecast and customer cycles
+    orders.py                    Supabase copy of Zoho invoices and nightly sync
   mcp/
     owner_server.py              17 owner-side Hermes tools
   storage/
@@ -40,6 +41,7 @@ src/hustleai/
     upgrade.py                   Expanded OAuth grant
     contacts.py                  Configure/sync/lookup command
     forecast.py                  Weekly forecast and cycle command
+    orders.py                    Orders sync and status command
 supabase/
   migrations/                    Applied initial PostgreSQL schema
   README.md                      Migration and cutover checklist

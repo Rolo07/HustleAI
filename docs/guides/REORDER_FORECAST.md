@@ -113,13 +113,36 @@ Set the tracking start date before enabling either schedule.
 - **Mac:** `deploy/schedule/com.hustleai.reorder-forecast.plist`. launchd uses
   the Mac's own timezone and runs only while the Mac is awake.
 
-## Zoho request cost
+The nightly orders sync has matching files: `hustleai-orders-sync.service` and
+`.timer` for the VPS, and `com.hustleai.orders-sync.plist` for the Mac. Both run
+at 22:00 South African time. As with the forecast, run it on one machine only.
 
-One paged list of all invoices finds every customer's order dates. Full invoices
-and contact details are fetched only for customers who are expected or overdue:
-up to three invoices and one contact each. A run stops safely at the client's
-limit of 800 read requests. The requests are spaced out, so a large run can take
-a few minutes.
+## Orders copy and Zoho requests
+
+The forecast reads orders from a Supabase copy of Zoho invoices, not from Zoho,
+so a run takes seconds. Zoho is read only for contact details of expected and
+overdue customers, and for any order whose details are not copied yet.
+
+Zoho allows **1,000 requests a day**, and the count resets at **midnight South
+African time**. The copy is kept current in two ways:
+
+1. **Immediately:** invoices the app creates or updates, and invoices it records
+   a payment against, are copied as soon as Zoho confirms the write. If the copy
+   fails, the Zoho write still stands and the nightly sync repairs it.
+2. **Nightly at 22:00:** `hustleai-orders sync` lists every invoice, which costs
+   a few requests. It saves new and changed invoices, compared by Zoho's
+   last-modified time, and flags invoices no longer in Zoho as deleted. It then
+   reads missing line items newest first until only 100 of the day's requests
+   remain. Anything left waits for the next night.
+
+```sh
+.venv/bin/hustleai-orders sync     # run the sync now
+.venv/bin/hustleai-orders status   # last sync, pending details, requests left
+```
+
+The forecast refuses to run until the first sync has finished. The report shows
+when orders were last synced and warns if that was more than two days ago.
+Zoho stays the source of truth; the copy is never edited by hand.
 
 ## Limits
 

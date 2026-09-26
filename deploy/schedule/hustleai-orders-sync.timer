@@ -1,0 +1,12 @@
+# Nightly at 22:00 South African time: two hours before Zoho's daily request
+# limit resets at midnight, so the sync uses what is left of the day's quota.
+# Enable: sudo systemctl enable --now hustleai-orders-sync.timer
+[Unit]
+Description=Sync HustleAI orders from Zoho every night before the quota reset
+
+[Timer]
+OnCalendar=*-*-* 22:00:00 Africa/Johannesburg
+Persistent=true
+
+[Install]
+WantedBy=timers.target

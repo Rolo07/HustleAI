@@ -127,7 +127,7 @@ FLOWS = [
  ('time',1,0,'Monday 07:00 SA time','Weekly timer, or Roland asks Hermes','event'),
  ('saved',1,1,'Report saved this week?','Rebuild only when refresh is asked','decision'),
  ('reuse',2,1,'Return saved report','No Zoho requests','success'),
- ('read',1,2,'Read Zoho invoice history','Orders since VPS go-live; no drafts, voids or tests','action'),
+ ('read',1,2,'Read synced orders','Supabase copy since go-live; no drafts, voids or tests','action'),
  ('excluded',1,3,'Excluded by Roland?','Checked for each customer','decision'),
  ('skip',0,3,'Skip customer','Counted as excluded in the report','stop'),
  ('cycle',1,4,'Cycle set by Roland?','Otherwise use order history','decision'),

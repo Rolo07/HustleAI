@@ -33,6 +33,7 @@ class Client:
         self.organization = organization
         self.context = tls_context()
         self.calls = 0
+        self.rate_remaining = None  # Zoho's daily requests left, from response headers.
         credentials = json.loads((ROOT / '.zoho-credentials.json').read_text())
         data = urllib.parse.urlencode({
             key: credentials[key] for key in ('client_id', 'client_secret', 'refresh_token')
@@ -56,12 +57,16 @@ class Client:
         Raises:
             ValueError: HTTP/API errors, connection failure, timeout, or invalid JSON.
 
+        Records X-Rate-Limit-Remaining as rate_remaining when Zoho sends it.
         Uses the verified TLS context and a 30-second timeout. Error messages omit
         response bodies and credentials. Does not retry requests: callers must
         resolve uncertain write outcomes before submitting another mutation.
         """
         try:
             with urllib.request.urlopen(request, context=self.context, timeout=30) as response:
+                remaining = response.headers.get('X-Rate-Limit-Remaining')
+                if remaining is not None and str(remaining).isdigit():
+                    self.rate_remaining = int(remaining)
                 result = json.load(response)
         except urllib.error.HTTPError as error:
             raise ValueError(f'Zoho returned HTTP {error.code}; check permissions, organization ID and API quota.') from None

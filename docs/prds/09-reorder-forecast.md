@@ -81,6 +81,10 @@ report listed them.
 
 ## State and recovery
 
+- Orders come from a Supabase copy of Zoho invoices. App writes update it at
+  once; a nightly 22:00 sync, before Zoho's midnight quota reset, compares every
+  invoice and repairs drift. The forecast will not run before the first sync.
+
 - One saved report per organization and run date. A rerun on the same date
   replaces that report, so a doubled scheduled run never creates duplicates.
 - On-demand requests reuse a report from the last seven days unless Roland asks
@@ -117,4 +121,5 @@ These are covered by `tests/unit/test_forecast.py` and the opt-in PostgreSQL sui
 | Long-lapsed customers | Stay in the overdue list until Roland excludes them. An automatic cut-off could be added later. |
 | Seasonal or irregular customers | Handled by owner-set cycles; no seasonal model. |
 | Only-selected-customers mode | Not built. The current design includes everyone with history. |
+| Orders copy | Decided 2026-09-27: copy invoices to Supabase on app writes and sync nightly at 22:00 SAST before the Zoho quota resets. |
 | Tracking start date | Decided 2026-09-27: count orders only from VPS go-live. Set with `hustleai-forecast start-date today` at deployment. |

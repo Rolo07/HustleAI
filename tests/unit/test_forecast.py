@@ -64,13 +64,15 @@ class ForecastAPI:
     def add(self, iid, cid, day, total, lines, status='paid'):
         self.invoices[iid] = {'invoice_id': iid, 'invoice_number': 'INV-' + iid, 'customer_id': cid,
                               'customer_name': self.contacts[cid]['contact_name'], 'date': day,
-                              'status': status, 'total': total, 'currency_code': 'ZAR', 'line_items': lines}
+                              'status': status, 'total': total, 'currency_code': 'ZAR', 'line_items': lines,
+                              'notes': '', 'last_modified_time': day + 'T10:00:00+0200'}
 
     def pages(self, path, key):
         assert (path, key) == ('invoices', 'invoices')
         self.gets.append(path)
-        # Summaries carry no line items, like Zoho's list endpoint.
-        return iter([{k: v for k, v in inv.items() if k != 'line_items'} for inv in self.invoices.values()])
+        # Summaries carry no line items or notes, like Zoho's list endpoint.
+        return iter([{k: v for k, v in inv.items() if k not in ('line_items', 'notes')}
+                     for inv in self.invoices.values()])
 
     def get(self, path):
         self.gets.append(path)
@@ -134,6 +136,7 @@ class ForecastTests(unittest.TestCase):
         self.s = Service(self.api, self.root)
         self.s.exclude_from_forecast('0820000004')
         self.s.set_order_cycle('0820000006', 10)
+        self.s.sync_orders()
         self.api.gets.clear()
 
     def tearDown(self):
@@ -167,14 +170,29 @@ class ForecastTests(unittest.TestCase):
         report = self.s.build_forecast(TODAY)
         names = [c['customer_name'] for c in report['due'] + report['overdue']]
         self.assertNotIn('Echo Foods', names)  # without the test order, Echo is due today
-        self.assertIn('invoices/504', self.api.gets)
 
-    def test_details_fetched_only_for_listed_customers(self):
+    def test_forecast_reads_orders_copy_not_zoho_invoices(self):
         self.s.build_forecast(TODAY)
+        self.assertFalse([p for p in self.api.gets if p.startswith('invoices')])
         contacts = sorted(p for p in self.api.gets if p.startswith('contacts/'))
         self.assertEqual(contacts, ['contacts/1', 'contacts/2', 'contacts/6'])
-        self.assertNotIn('invoices/101', self.api.gets)  # 4th-oldest order is never read
-        self.assertNotIn('invoices/401', self.api.gets)  # excluded customer is never read
+
+    def test_missing_details_are_read_once_and_saved(self):
+        for order in self.s.store.orders():  # simulate a sync that ran out of quota
+            summary = {k: v for k, v in self.api.invoices[order['invoice_id']].items() if k not in ('line_items', 'notes')}
+            self.s.record_order(summary, source='sync')
+        self.s.build_forecast(TODAY)
+        read = sorted(p for p in self.api.gets if p.startswith('invoices/'))
+        self.assertEqual(read, ['invoices/102', 'invoices/103', 'invoices/104', 'invoices/201',
+                                'invoices/202', 'invoices/502', 'invoices/503', 'invoices/504', 'invoices/601'])
+        self.api.gets.clear()
+        self.s.build_forecast(TODAY)
+        self.assertFalse([p for p in self.api.gets if p.startswith('invoices/')])
+
+    def test_never_synced_is_an_error(self):
+        self.s.db.execute('DELETE FROM sync_runs'); self.s.db.commit()
+        with self.assertRaisesRegex(ValueError, 'hustleai-orders sync'):
+            self.s.build_forecast(TODAY)
 
     def test_saved_report_is_reused_within_the_week(self):
         first = self.s.reorder_forecast(today=TODAY)
@@ -206,7 +224,9 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual((alpha['cycle_days'], alpha['confidence'], alpha['expected_value']), (14, 'low', '120.00'))
         self.assertEqual(report['overdue'], [])  # Bravo's August orders are before tracking
         names = [c['customer_name'] for c in report['unpredictable']]
-        self.assertEqual(names, [])  # Charlie's only order is before tracking
+        # Charlie's only order is before tracking. Echo has one real order since
+        # then: its 10-01 invoice is a test order, filtered out using synced lines.
+        self.assertEqual(names, ['Echo Foods'])
         self.assertIn('Only orders from 2026-09-10 onward', render_markdown(report))
 
     def test_invalid_start_date(self):
@@ -252,6 +272,7 @@ class ForecastTests(unittest.TestCase):
                         'Unable to predict (1)', 'Estimated total: R210.00'):
             self.assertIn(heading, text)
         self.assertIn('2026-10-12 to 2026-10-18', text)
+        self.assertIn('Orders last synced from Zoho', text)
 
 
 if __name__ == '__main__':

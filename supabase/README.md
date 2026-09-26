@@ -15,7 +15,7 @@ No Zoho clients, invoices or payments were created or changed during migration.
 | Location | Responsibility |
 | --- | --- |
 | Zoho Invoice | Authoritative clients, products, invoices and recorded payments |
-| Supabase `hustle_private` schema | Phone index, operation claims/results, versioned reviews and approvals |
+| Supabase `hustle_private` schema | Phone index, operation claims/results, versioned reviews and approvals, forecast settings and reports, and a synced copy of Zoho invoices (`orders`) |
 | Local private data directory | OAuth credentials, restricted database settings, CA certificate and PDF files |
 | Legacy Markdown mapping | Removed locally after hosted verification; hosted sync does not recreate it |
 | Legacy SQLite journal | Removed locally after hosted verification; history is in Supabase |
