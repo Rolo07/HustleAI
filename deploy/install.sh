@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# HustleAI installer for an Ubuntu VPS (tested target: Ubuntu 24.04).
+#
+#   curl -fsSLO https://raw.githubusercontent.com/Rolo07/HustleAI/main/deploy/install.sh
+#   sudo bash install.sh
+#
+# Before running, copy RG Midrand's private files from the Mac with
+# deploy/send-to-vps.sh. Safe to run again: finished steps are skipped and
+# the code is updated. It asks before anything that needs your input.
+set -euo pipefail
+
+REPO="https://github.com/Rolo07/HustleAI.git"
+APP=/opt/hustleai
+DATA=/var/lib/hustleai
+TENANTS=$DATA/tenants
+USER_NAME=hermes
+SLUG=rg-midrand
+TRANSFER=/root/rg-transfer
+BIN=$APP/.venv/bin
+
+step() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
+ok()   { printf '\033[32m%s\033[0m\n' "$*"; }
+warn() { printf '\033[33m%s\033[0m\n' "$*"; }
+die()  { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
+ask()  { local answer; read -r -p "$1" answer </dev/tty; printf '%s' "$answer"; }
+confirm() { [[ "$(ask "$1 [y/N] ")" =~ ^[Yy] ]]; }
+
+[[ $EUID -eq 0 ]] || die "Run as root: sudo bash install.sh"
+command -v apt-get >/dev/null || die "This installer supports Ubuntu/Debian only."
+
+# Run a command as the service user with its own home, PATH and systemd user bus.
+as_user() {
+  local uid; uid=$(id -u "$USER_NAME")
+  (cd "/home/$USER_NAME" && sudo -u "$USER_NAME" -H env \
+    HOME="/home/$USER_NAME" \
+    PATH="/home/$USER_NAME/.local/bin:$BIN:/usr/local/bin:/usr/bin:/bin" \
+    XDG_RUNTIME_DIR="/run/user/$uid" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+    HUSTLEAI_TENANTS_ROOT="$TENANTS" \
+    "$@")
+}
+
+step "1/7 System packages, timezone and firewall"
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -q
+apt-get install -y -q python3-venv python3-dev git curl build-essential caddy >/dev/null
+timedatectl set-timezone Africa/Johannesburg
+if command -v ufw >/dev/null; then
+  ufw allow OpenSSH >/dev/null && ufw allow 80 >/dev/null && ufw allow 443 >/dev/null && ufw --force enable >/dev/null
+fi
+ok "Packages installed; timezone $(timedatectl show -p Timezone --value)."
+
+step "2/7 Service user and folders"
+id "$USER_NAME" >/dev/null 2>&1 || adduser --disabled-password --gecos "" "$USER_NAME" >/dev/null
+loginctl enable-linger "$USER_NAME"
+mkdir -p "$APP" "$TENANTS"
+chown "$USER_NAME:$USER_NAME" "$APP" "$DATA" "$TENANTS"
+chmod 700 "$DATA" "$TENANTS"
+ok "User $USER_NAME; code in $APP; private data in $DATA."
+
+step "3/7 HustleAI code"
+if [[ -d $APP/.git ]]; then
+  as_user git -C "$APP" pull --ff-only
+else
+  as_user git clone -q "$REPO" "$APP"
+fi
+[[ -x $BIN/python ]] || as_user python3 -m venv "$APP/.venv"
+as_user "$BIN/pip" install -q --upgrade pip
+as_user "$BIN/pip" install -q -e "$APP[postgres,hermes]"
+grep -q "$BIN" "/home/$USER_NAME/.bashrc" 2>/dev/null || \
+  echo "export PATH=$BIN:\$PATH HUSTLEAI_TENANTS_ROOT=$TENANTS" >> "/home/$USER_NAME/.bashrc"
+ok "Installed $(as_user git -C "$APP" log --oneline -1)."
+
+step "4/7 RG Midrand data"
+TENANT_DIR=$TENANTS/$SLUG
+if [[ -f $TENANT_DIR/tenant.json ]]; then
+  ok "Tenant $SLUG already exists; skipping import."
+else
+  [[ -d $TRANSFER ]] || die "No private files at $TRANSFER. On the Mac run: ./deploy/send-to-vps.sh root@<this-server>"
+  STAGE=$DATA/rg-import
+  rm -rf "$STAGE"
+  cp -a "$TRANSFER" "$STAGE"
+  mv "$STAGE/prod-ca-2021.crt" "$DATA/prod-ca-2021.crt"
+  chown -R "$USER_NAME:$USER_NAME" "$DATA"
+  chmod 700 "$STAGE"; chmod 644 "$DATA/prod-ca-2021.crt"
+  # The copied database settings point at the certificate's path on the Mac.
+  as_user python3 - "$STAGE/.supabase-runtime.json" "$DATA/prod-ca-2021.crt" <<'EOF'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1]); s = json.loads(p.read_text()); s['sslrootcert'] = sys.argv[2]
+p.write_text(json.dumps(s, indent=2) + '\n')
+EOF
+  as_user "$BIN/hustleai-tenant" import-legacy "$SLUG" --from "$STAGE" \
+    --name "RG Midrand" --owner-name Roland --owner-number +27837758811
+  rm -rf "$STAGE" "$TRANSFER"
+  as_user env HUSTLEAI_DATA_DIR="$TENANT_DIR" "$BIN/hustleai-forecast" start-date today
+  ok "Imported. The copies in $TRANSFER were removed."
+fi
+as_user env HUSTLEAI_DATA_DIR="$TENANT_DIR" "$BIN/hustleai-orders" status || warn "Orders not synced yet; the nightly job will do it."
+
+step "5/7 Hermes Agent"
+if ! as_user bash -c 'command -v hermes' >/dev/null; then
+  echo "Installing Hermes (its own setup may ask you questions)..."
+  as_user bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash' </dev/tty
+fi
+as_user bash -c 'command -v hermes' >/dev/null || die "Hermes did not install. Check the output above, then rerun this installer."
+if [[ ! -f /home/$USER_NAME/.hermes/.hustleai-model-set ]] || confirm "Choose the AI model/provider for Hermes again?"; then
+  as_user hermes model </dev/tty
+  as_user touch "/home/$USER_NAME/.hermes/.hustleai-model-set"
+fi
+as_user "$BIN/hustleai-tenant" hermes-install "$SLUG"
+as_user hermes gateway install </dev/tty || warn "hermes gateway install failed; run it later as $USER_NAME."
+ok "Hermes profile $SLUG ready."
+as_user hermes -p "$SLUG" cron list || true
+
+step "6/7 WhatsApp"
+if [[ -f $TENANT_DIR/.whatsapp.json ]] && ! confirm "WhatsApp is already set up. Change it?"; then
+  ok "Keeping the existing WhatsApp settings."
+elif confirm "Do you have the Meta details now (phone number ID, access token, app secret)?"; then
+  NUMBER=$(ask "Business WhatsApp number (e.g. +27821234567): ")
+  PHONE_ID=$(ask "Meta phone number ID (digits): ")
+  as_user "$BIN/hustleai-whatsapp" setup --tenant "$SLUG" --business-number "$NUMBER" --phone-number-id "$PHONE_ID" </dev/tty
+  as_user "$BIN/hustleai-whatsapp" check --tenant "$SLUG" || warn "Meta check failed; fix the settings and rerun."
+  as_user "$BIN/hustleai-tenant" hermes-install "$SLUG"   # connects WhatsApp chats to Hermes
+else
+  warn "Skipped. Rerun this installer when you have the Meta details."
+fi
+
+step "7/7 Gateway service and HTTPS"
+if [[ -f $TENANT_DIR/.whatsapp.json ]]; then
+  cp "$APP/deploy/schedule/hustleai-gateway.service" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now hustleai-gateway >/dev/null
+  systemctl restart hustleai-gateway
+  DOMAIN=$(grep -oE '^[a-z0-9.-]+\.[a-z]+ \{' /etc/caddy/Caddyfile 2>/dev/null | head -1 | cut -d' ' -f1 || true)
+  if [[ -z $DOMAIN || $DOMAIN == hustleai.example.com ]]; then
+    DOMAIN=$(ask "Domain pointing at this server (e.g. hustle.yourdomain.co.za): ")
+  fi
+  sed "s/hustleai.example.com/$DOMAIN/" "$APP/deploy/Caddyfile.example" > /etc/caddy/Caddyfile
+  systemctl reload caddy || systemctl restart caddy
+  sleep 3
+  if curl -fsS "https://$DOMAIN/health" >/dev/null 2>&1; then
+    ok "https://$DOMAIN/health is ok."
+  else
+    warn "https://$DOMAIN/health not reachable yet. Check DNS points here, then: journalctl -u caddy -n 50"
+  fi
+  VERIFY=$(python3 -c "import json;print(json.load(open('$TENANT_DIR/.whatsapp.json'))['verify_token'])")
+  printf '\n\033[1mIn the Meta app (WhatsApp > Configuration):\033[0m\n'
+  echo "  Callback URL:  https://$DOMAIN/webhook/$SLUG"
+  echo "  Verify token:  $VERIFY"
+  echo "  Subscribe to:  messages"
+  echo "Then send HELP to the business number from your phone."
+else
+  warn "Gateway not started: WhatsApp isn't set up yet."
+fi
+
+printf '\n\033[1;32mInstall finished.\033[0m\n'
+echo "Logs:     journalctl -u hustleai-gateway -f   |   $TENANT_DIR/reports/jobs.log"
+echo "Update:   sudo bash $APP/deploy/install.sh"

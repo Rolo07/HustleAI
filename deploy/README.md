@@ -1,4 +1,29 @@
-# VPS deployment layout
+# VPS deployment
+
+## Quick install
+
+1. On the Mac, from the HustleAI folder, copy the private files that are kept out of Git:
+
+   ```sh
+   ./deploy/send-to-vps.sh root@<server-ip>
+   ```
+
+2. On the server:
+
+   ```sh
+   curl -fsSLO https://raw.githubusercontent.com/Rolo07/HustleAI/main/deploy/install.sh
+   sudo bash install.sh
+   ```
+
+The installer sets the timezone and firewall and creates the `hermes` user. It
+installs the code, imports RG Midrand as tenant `rg-midrand`, and installs
+Hermes with its profile and scheduled jobs. It then asks for the WhatsApp
+details and starts the gateway behind HTTPS. It asks before anything that
+needs input. Run it again at any time to update: finished steps are skipped.
+
+The manual steps below explain what it does.
+
+## Manual layout
 
 Install source separately from private state:
 
