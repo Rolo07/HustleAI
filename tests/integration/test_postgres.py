@@ -47,6 +47,8 @@ class PostgresTests(WorkflowTests):
                 cls.admin.execute(orders.replace('hustle_private', cls.schema))
                 gateway = (Path(__file__).parents[2] / 'supabase/migrations/202609270005_whatsapp_gateway.sql').read_text()
                 cls.admin.execute(gateway.replace('hustle_private', cls.schema))
+                tenants = (Path(__file__).parents[2] / 'supabase/migrations/202609290006_tenants.sql').read_text()
+                cls.admin.execute(tenants.replace('hustle_private', cls.schema))
         except BaseException:
             cls.admin.execute(sql.SQL('DROP SCHEMA IF EXISTS {} CASCADE').format(sql.Identifier(cls.schema)))
             cls.admin.close()
@@ -124,7 +126,7 @@ class PostgresTests(WorkflowTests):
             self.admin.execute(f'CREATE TABLE {schema}.schema_migrations (version text PRIMARY KEY, checksum text NOT NULL)')
             self.admin.execute(f'INSERT INTO {schema}.schema_migrations VALUES (%s,%s)', (initial.name, hashlib.sha256(initial.read_bytes()).hexdigest()))
             applied = apply_upgrades(self.admin, directory, schema)
-            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql', '202609270004_orders.sql', '202609270005_whatsapp_gateway.sql'])
+            self.assertEqual(applied, ['202609260002_workflow_functions.sql', '202609260003_reorder_forecast.sql', '202609270004_orders.sql', '202609270005_whatsapp_gateway.sql', '202609290006_tenants.sql'])
             self.assertEqual(apply_upgrades(self.admin, directory, schema), [])
             with tempfile.TemporaryDirectory() as changed:
                 for path in directory.glob('*.sql'):
@@ -160,7 +162,7 @@ class PostgresTests(WorkflowTests):
         finally:
             store.close()
         functions = self.admin.execute("SELECT p.prosecdef, has_function_privilege('anon',p.oid,'EXECUTE'), has_function_privilege('authenticated',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=%s", (self.schema,)).fetchall()
-        self.assertEqual(len(functions), 4)
+        self.assertEqual(len(functions), 5)  # four workflow functions plus apply_tenant_policy
         self.assertTrue(all(row == (False, False, False) for row in functions))
 
     def test_forecast_settings_and_reports_are_organization_scoped(self):
@@ -274,6 +276,62 @@ class PostgresTests(WorkflowTests):
                 runtime.touch_conversation('+27820000002')
         finally:
             runtime.close()
+
+    def test_two_tenants_are_isolated_by_the_database(self):
+        """Two tenant roles each see and write only their own organization's rows."""
+        from psycopg import errors, sql
+        suffix = uuid.uuid4().hex[:8]
+        roles = {'777': f'hustle_test_a_{suffix}', '888': f'hustle_test_b_{suffix}'}  # 123 is mapped by the migration
+        admin_user = self.admin.execute('SELECT current_user').fetchone()[0]
+        try:
+            for organization, role in roles.items():
+                self.admin.execute(sql.SQL('CREATE ROLE {} NOLOGIN INHERIT IN ROLE hustleai_tenant').format(sql.Identifier(role)))
+                self.admin.execute(sql.SQL('GRANT {} TO {}').format(sql.Identifier(role), sql.Identifier(admin_user)))
+                self.admin.execute(f'INSERT INTO {self.schema}.tenant_roles (role_name, organization_id) VALUES (%s,%s)', (role, organization))
+            for organization in roles:  # Seed rows for both tenants as the table owner.
+                self.admin.execute(f"INSERT INTO {self.schema}.operations (id,organization_id,kind,payload,preview,created_at,status) VALUES (%s,%s,'invoice','{{}}','{{}}',now(),'pending')",
+                                   ('op-' + organization, organization))
+                self.admin.execute(f"INSERT INTO {self.schema}.conversation_windows VALUES (%s,%s,now())", (organization, '+2782000000' + organization[0]))
+            for organization, role in roles.items():
+                db = connect(ROOT, '.supabase-credentials.json')
+                try:
+                    db.execute(sql.SQL('SET ROLE {}').format(sql.Identifier(role)))
+                    for table in ('operations', 'conversation_windows'):
+                        seen = db.execute(f'SELECT DISTINCT organization_id FROM {self.schema}.{table}').fetchall()
+                        self.assertEqual(seen, [(organization,)], table)
+                    store = PostgresRepository(ROOT, organization, db, self.schema)
+                    store.touch_conversation('+27829999999')
+                    other = '888' if organization == '777' else '777'
+                    with self.assertRaises(errors.InsufficientPrivilege):
+                        db.execute(f"INSERT INTO {self.schema}.conversation_windows VALUES (%s,'+27828888888',now())", (other,))
+                    self.assertEqual(db.execute(f'SELECT organization_id FROM {self.schema}.tenant_roles').fetchall(), [(organization,)])
+                finally:
+                    db.close()
+        finally:
+            self.admin.execute(f'DELETE FROM {self.schema}.tenant_roles WHERE role_name = ANY(%s)', (list(roles.values()),))
+            for role in roles.values():
+                self.admin.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(role)))
+
+    def test_provision_tenant_maps_one_organization(self):
+        from psycopg import sql
+        from hustleai.storage.postgres.migrate import provision_tenant, tenant_role_name
+        slug = 'test-' + uuid.uuid4().hex[:8]
+        role = tenant_role_name(slug)
+        settings = json.loads((ROOT / '.supabase-credentials.json').read_text())
+        with tempfile.TemporaryDirectory() as folder:
+            try:
+                self.assertEqual(provision_tenant(self.admin, settings, folder, slug, '789', self.schema), role)
+                self.assertEqual(provision_tenant(self.admin, settings, folder, slug, '789', self.schema), role)  # rerun is safe
+                saved = json.loads((Path(folder) / '.supabase-runtime.json').read_text())
+                self.assertTrue(saved['user'].startswith(role))
+                self.assertEqual(oct((Path(folder) / '.supabase-runtime.json').stat().st_mode & 0o777), '0o600')
+                with tempfile.TemporaryDirectory() as second, self.assertRaisesRegex(ValueError, 'another tenant'):
+                    provision_tenant(self.admin, settings, second, 'other-' + slug, '789', self.schema)
+                attributes = self.admin.execute('SELECT rolinherit, rolbypassrls FROM pg_roles WHERE rolname=%s', (role,)).fetchone()
+                self.assertEqual(attributes, (True, False))
+            finally:
+                self.admin.execute(f'DELETE FROM {self.schema}.tenant_roles WHERE role_name=%s', (role,))
+                self.admin.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(role)))
 
     def test_database_rejects_expired_claim(self):
         oid = self.s.proposal('invoice', {}, {})['operation_id']

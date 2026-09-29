@@ -164,6 +164,54 @@ def provision_runtime(admin, root, organization):
                 target, sql.Identifier(ROLE), sql.Literal(organization), sql.Literal(organization)))
 
 
+def tenant_role_name(slug):
+    """Database login name for a tenant slug, e.g. rg-midrand -> hustleai_rt_rg_midrand."""
+    if not slug or not all(c.isalnum() or c == '-' for c in slug) or slug != slug.lower():
+        raise ValueError('Tenant slugs use lowercase letters, digits and hyphens.')
+    return 'hustleai_rt_' + slug.replace('-', '_')
+
+
+def provision_tenant(admin, admin_settings, tenant_root, slug, organization, schema=SCHEMA):
+    """Create or reuse a tenant's restricted login and write its private settings.
+
+    The login inherits hustleai_tenant (all grants live there) and is mapped
+    to exactly one organization in tenant_roles, which every table policy
+    checks. The password is saved to tenant_root/.supabase-runtime.json
+    before the role is created, so an interrupted run can resume. Requires
+    migration 202609290006. Returns the login role name.
+    """
+    from psycopg import sql
+    role = tenant_role_name(slug)
+    runtime_path = Path(tenant_root) / '.supabase-runtime.json'
+    exists = admin.execute('SELECT 1 FROM pg_roles WHERE rolname=%s', (role,)).fetchone()
+    if exists and not runtime_path.exists():
+        raise ValueError('Tenant login exists but its settings file is missing; restore it before resuming.')
+    if runtime_path.exists():
+        runtime = json.loads(runtime_path.read_text())
+    else:
+        project = admin_settings['user'].split('.', 1)[1] if '.' in admin_settings['user'] else ''
+        runtime = dict(admin_settings, user=role + ('.' + project if project else ''),
+                       password=secrets.token_urlsafe(40))
+        private_write(runtime_path, json.dumps(runtime, indent=2) + '\n')
+    with admin.transaction():
+        owner = admin.execute(f'SELECT organization_id FROM {schema}.tenant_roles WHERE role_name=%s', (role,)).fetchone()
+        if owner and owner[0] != str(organization):
+            raise ValueError('This tenant login is already mapped to a different organization.')
+        taken = admin.execute(f'SELECT role_name FROM {schema}.tenant_roles WHERE organization_id=%s', (str(organization),)).fetchone()
+        if taken and taken[0] != role:
+            raise ValueError('That organization already belongs to another tenant login.')
+        if not exists:
+            admin.execute(sql.SQL('CREATE ROLE {} LOGIN PASSWORD {} INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS').format(
+                sql.Identifier(role), sql.Literal(runtime['password'])))
+        attributes = admin.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolbypassrls FROM pg_roles WHERE rolname=%s', (role,)).fetchone()
+        if any(attributes):
+            raise ValueError('Tenant login has unexpected administrative privileges.')
+        admin.execute(sql.SQL('GRANT hustleai_tenant TO {}').format(sql.Identifier(role)))
+        admin.execute(f'INSERT INTO {schema}.tenant_roles (role_name, organization_id) VALUES (%s,%s) ON CONFLICT (role_name) DO NOTHING',
+                      (role, str(organization)))
+    return role
+
+
 def import_records(admin, organization, source, mappings):
     """Import history atomically, preserve attempted states and revoke approvals.
 
