@@ -18,9 +18,9 @@ below are for a single-business install without Hermes.
 | Task | When | Command | What it does | Zoho requests |
 | --- | --- | --- | --- | --- |
 | Orders sync | **Every day, 22:00** | `hustleai-orders sync` | Compares every Zoho invoice with the Supabase copy, saves changes, flags deletions and reads missing line items until 100 of the day's requests remain. | A few for the listing, plus one per missing invoice detail |
-| Reorder forecast | **Every Monday, 07:00** | `hustleai-forecast run --send` | Builds the forecast for customers expected 7–14 days out from the synced copy, saves it and sends it to Roland on WhatsApp. | One per expected or overdue customer, for contact details |
-| WhatsApp gateway | **Always on** (not scheduled) | `hustleai-whatsapp serve --all-tenants` (multi-tenant) or `serve` | Receives messages, runs Roland's commands, refers customers and sends held messages. | Only when a command needs Zoho |
-| Daily summary | **Every day, 20:00** | Not built yet (PRD 08) | Will send Roland a summary of the day's activity. | — |
+| Reorder forecast | **Every Monday, 07:00** | `hustleai-forecast run --send` | Builds the forecast for customers expected 7–14 days out from the synced copy, saves it and sends it to the owner on WhatsApp. | One per expected or overdue customer, for contact details |
+| WhatsApp gateway | **Always on** (not scheduled) | `hustleai-whatsapp serve --all-tenants` (multi-tenant) or `serve` | Receives messages, runs the owner's commands, refers customers and sends held messages. | Only when a command needs Zoho |
+| Daily summary | **Every day, 20:00** | Not built yet (PRD 08) | Will send the owner a summary of the day's activity. | — |
 
 ## Why these times
 
