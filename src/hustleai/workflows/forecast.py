@@ -1,7 +1,7 @@
 """Weekly reorder forecast for stock ordering and delivery planning.
 
 Predicts each customer's next order from their last three order dates, or from
-a cycle Roland set for that customer. Read-only in Zoho: it never creates
+a cycle the owner set for that customer. Read-only in Zoho: it never creates
 drafts, contacts customers or changes invoices. Reports are saved in storage
 so the weekly job and the owner MCP tool return the same content.
 """
@@ -22,9 +22,12 @@ HISTORY_ORDERS = 3     # Most recent distinct order dates used for prediction.
 REUSE_DAYS = 7         # A saved report is reused for on-demand requests within a week.
 
 
-def local_today(now=None):
-    """Return today's date in South Africa, whatever the server timezone is."""
-    return (now or datetime.now(timezone.utc)).astimezone(TIMEZONE).date()
+def local_today(now=None, zone=None):
+    """Return today's date in the tenant's timezone, whatever the server's is.
+
+    zone defaults to TIMEZONE (South Africa) for callers without a tenant.
+    """
+    return (now or datetime.now(timezone.utc)).astimezone(zone or TIMEZONE).date()
 
 
 def predict(order_dates, override_days=None):
@@ -271,7 +274,7 @@ class ForecastWorkflows:
         Raises:
             ValueError: Zoho reads fail or the GET budget is reached.
         """
-        today = today or local_today()
+        today = today or local_today(zone=self.tenant.zone)
         if not refresh and exact_date:
             saved = self.store.forecast(today)
             if saved:
@@ -287,13 +290,14 @@ class ForecastWorkflows:
 
         Reads orders from storage, not Zoho. Zoho is read only for contact
         details of due or overdue customers, and for any order whose details
-        the nightly sync has not fetched yet. Customers Roland excluded are
+        the nightly sync has not fetched yet. Customers the owner excluded are
         skipped. Raises ValueError if orders were never synced.
         """
-        today = today or local_today()
+        today = today or local_today(zone=self.tenant.zone)
         synced_at, stale, _ = self.orders_freshness()
-        excluded_ids = set(map(str, self.workflow_config.get('test_invoice_ids', [])))
-        tracking = tracking_start(self.workflow_config)
+        tenant = self.tenant
+        excluded_ids = set(tenant.test_invoice_ids)
+        tracking = tracking_start({'forecast_start_date': tenant.forecast_start_date})
         settings = self.store.order_cycles()
         by_customer = defaultdict(list)
         for order in self.store.orders():
@@ -342,7 +346,7 @@ class ForecastWorkflows:
         start = today + timedelta(days=LEAD_DAYS)
         end = start + timedelta(days=WINDOW_DAYS)
         report = {'run_date': today.isoformat(), 'window_start': start.isoformat(), 'window_end': end.isoformat(),
-                  'timezone': str(TIMEZONE), 'tracking_since': tracking.isoformat() if tracking else None,
+                  'timezone': tenant.timezone, 'tracking_since': tracking.isoformat() if tracking else None,
                   'orders_synced_at': synced_at, 'orders_sync_stale': stale,
                   'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
                   'due': due, 'products': total_products(due), 'areas': group_by_area(due),
@@ -366,7 +370,7 @@ class ForecastWorkflows:
         while pool:
             prediction = predict([date.fromisoformat(s['date']) for s in pool], override_days)
             if prediction is None:
-                # One tracked order so far: listed so Roland can set a cycle.
+                # One tracked order so far: listed so the owner can set a cycle.
                 return 'unpredictable', max(date.fromisoformat(s['date']) for s in pool), []
             status = classify(prediction, today)
             if status is None:

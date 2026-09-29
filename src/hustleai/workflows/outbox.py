@@ -20,10 +20,11 @@ DONE = ('sent', 'delivered', 'read')
 class Outbox:
     """Send through a WhatsApp client, recording each message in storage."""
 
-    def __init__(self, store, client, settings):
+    def __init__(self, store, client, settings, zone=None):
         self.store = store
         self.client = client
         self.template = settings.get('notify_template') or {}
+        self.zone = zone or TIMEZONE  # The tenant's timezone, for once-a-day keys.
 
     def window_open(self, phone):
         """True if the recipient wrote within the last 23.5 hours."""
@@ -78,7 +79,7 @@ class Outbox:
         """Send the approved template at most once per recipient per day."""
         if not self.template.get('name'):
             return
-        today = datetime.now(TIMEZONE).date().isoformat()
+        today = datetime.now(self.zone).date().isoformat()
         key = f'nudge:{to}:{today}'
         row = self.store.create_delivery(uuid.uuid4().hex, 'nudge', key, to, {'type': 'template'})
         if row['status'] in DONE:

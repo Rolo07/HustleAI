@@ -9,9 +9,9 @@ from pathlib import Path
 
 from hustleai.config import DATA_DIR
 from hustleai.domain.phones import normalize
+from hustleai.tenant import load_tenant
 
 FILENAME = '.whatsapp.json'
-DEFAULT_OWNER = '+27837758811'
 DEFAULT_GRAPH_VERSION = 'v23.0'
 REQUIRED = ('phone_number_id', 'business_number', 'owner_number', 'access_token', 'app_secret', 'verify_token')
 
@@ -30,9 +30,9 @@ def configured(root=None):
         return False
 
 
-def international(value, field):
+def international(value, field, country='27'):
     """Normalize a +country number; local 0-prefixed numbers are rejected."""
-    number = normalize(value or '', '27')
+    number = normalize(value or '', country)
     if not number or not str(value).strip().startswith(('+', '00')):
         raise ValueError(f'{field} must be an international number such as +27821234567.')
     return number
@@ -43,23 +43,26 @@ def load(root=None):
 
     Returns a dict with normalized owner_number and business_number, and
     defaults for graph_version, host, port, confirmations_only,
-    notify_template and owner_agent.
+    notify_template and owner_agent. owner_number falls back to the
+    tenant's owner number when .whatsapp.json does not set one.
     Raises ValueError naming the missing or invalid field, never its value.
     """
     path = config_path(root)
+    tenant = load_tenant(Path(root or DATA_DIR))
     if not path.exists():
         raise ValueError('WhatsApp is not configured. Run: hustleai-whatsapp setup')
     try:
         settings = json.loads(path.read_text())
     except json.JSONDecodeError:
         raise ValueError(f'{FILENAME} is not valid JSON.') from None
+    settings['owner_number'] = settings.get('owner_number') or tenant.owner_number
     missing = [key for key in REQUIRED if not str(settings.get(key) or '').strip()]
     if missing:
         raise ValueError('WhatsApp settings are incomplete; missing: ' + ', '.join(missing))
     if not str(settings['phone_number_id']).isdigit():
         raise ValueError('phone_number_id must be the numeric ID from Meta, not the phone number.')
-    settings['owner_number'] = international(settings['owner_number'], 'owner_number')
-    settings['business_number'] = international(settings['business_number'], 'business_number')
+    settings['owner_number'] = international(settings['owner_number'], 'owner_number', tenant.country_code)
+    settings['business_number'] = international(settings['business_number'], 'business_number', tenant.country_code)
     if settings['owner_number'] == settings['business_number']:
         raise ValueError('The owner number must differ from the business number.')
     settings.setdefault('graph_version', DEFAULT_GRAPH_VERSION)

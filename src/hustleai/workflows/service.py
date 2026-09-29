@@ -8,6 +8,7 @@ from pathlib import Path
 from decimal import Decimal
 import uuid
 from hustleai.config import ROOT, CONFIG, MAPPING
+from hustleai.tenant import Tenant, read_settings
 from hustleai.integrations.zoho.client import API
 from hustleai.storage.backend import open_repository
 from contextlib import nullcontext
@@ -42,10 +43,12 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
             owns a database connection; use a context manager or close(). Payloads/results contain
             client information and must be protected like the credentials.
         """
-        config = json.loads(CONFIG.read_text())
-        self.country = config['country_code']
-        self.workflow_config = config
         self.root = Path(root)
+        config = read_settings(self.root, CONFIG)
+        if not config.get('organization_id'):
+            raise ValueError('No tenant settings found. Create tenant.json or run hustleai-tenant create.')
+        self.workflow_config = config
+        self.country = self.tenant.country_code
         self.mapping = self.root / MAPPING.name
         # One folder for every PDF: Zoho downloads and versioned review copies.
         self.pdf_dir = self.root / 'invoice-pdfs'
@@ -58,6 +61,15 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
         except BaseException:
             self.close()
             raise
+
+    @property
+    def tenant(self):
+        """Validated tenant settings, rebuilt from workflow_config on each use.
+
+        Deriving it each time keeps it consistent with workflow_config, which
+        some callers and tests update after construction.
+        """
+        return Tenant.from_settings(self.workflow_config)
 
     def close(self):
         """Release this service's storage session, including any session locks."""
@@ -77,7 +89,7 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
         Args:
             kind: Internal kind: client, invoice, payment, or draft_update.
             payload: Validated JSON-ready request body prepared by this service.
-            preview: JSON-ready details to show Roland before confirmation.
+            preview: JSON-ready details to show the owner before confirmation.
 
         Returns:
             Dictionary with operation_id, preview, expires_in_seconds (1800),
@@ -95,16 +107,16 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
         operation = uuid.uuid4().hex
         self.store.create_operation(operation, kind, payload, preview)
         return {'operation_id': operation, 'preview': preview, 'expires_in_seconds': 1800,
-                'confirmation_required': f'Ask Roland to reply CONFIRM {operation}. Do not confirm on his behalf.'}
+                'confirmation_required': f'Ask {self.tenant.owner_name} to reply CONFIRM {operation}. Do not confirm on their behalf.'}
 
     def confirm(self, operation_id, user_confirmation):
         """Execute one confirmed proposal with durable protection against replay.
 
         Args:
             operation_id: UUID returned by a prepare_* proposal in this organization.
-            user_confirmation: Roland's exact "CONFIRM <operation_id>" reply;
+            user_confirmation: the owner's exact "CONFIRM <operation_id>" reply;
                 surrounding whitespace is ignored. The caller must authenticate
-                Roland and relay his reply, never synthesize consent.
+                the owner and relay their reply, never synthesize consent.
 
         Returns:
             Zoho's response dictionary, or the saved response for a completed ID.
@@ -130,7 +142,7 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
         check is not authentication; the Hermes gateway enforces caller identity.
         """
         if user_confirmation.strip() != 'CONFIRM ' + operation_id:
-            raise ValueError('Relay the exact confirmation supplied by Roland after showing the preview.')
+            raise ValueError(f'Relay the exact confirmation supplied by {self.tenant.owner_name} after showing the preview.')
         operation = self.store.claim_operation(operation_id)
         if operation['status'] == 'done':
             return operation['result']

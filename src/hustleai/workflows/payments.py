@@ -47,4 +47,4 @@ class PaymentWorkflows:
                    'amount': float(amount), 'date': date.fromisoformat(payment_date).isoformat(),
                    'reference_number': reference, 'invoices': [{'invoice_id': identifier(invoice_id),
                                                               'amount_applied': float(amount)}]}
-        return self.proposal('payment', payload, {'record_only_no_charge': True, 'currency': 'ZAR', 'payment': payload})
+        return self.proposal('payment', payload, {'record_only_no_charge': True, 'currency': self.tenant.currency, 'payment': payload})

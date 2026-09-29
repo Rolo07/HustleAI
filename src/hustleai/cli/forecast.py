@@ -64,7 +64,7 @@ def send_to_owner(service, report):
     if not wa_config.configured(ROOT):
         return 'WhatsApp is not set up yet; the report was saved but not sent.'
     settings = wa_config.load(ROOT)
-    rows = Outbox(service.store, WhatsAppClient(settings), settings).send_text(
+    rows = Outbox(service.store, WhatsAppClient(settings), settings, service.tenant.zone).send_text(
         'forecast', f"forecast:{report['run_date']}", settings['owner_number'], render_whatsapp(report))
     statuses = {row['status'] for row in rows}
     if statuses == {'waiting_window'}:
@@ -99,6 +99,7 @@ def main(argv=None):
         return
 
     with Service() as service:
+        service.tenant.require('forecast')
         if args.command == 'run':
             report = service.reorder_forecast(args.refresh, args.date, exact_date=True)
             path = write_report(report)

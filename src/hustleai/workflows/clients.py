@@ -91,8 +91,9 @@ class ClientWorkflows:
             matches = [c for c in matches if str(c['contact_id']) == identifier(contact_id)]
         if len(matches) != 1:
             raise ValueError('No unique client match. Refresh mapping or select a contact ID from lookup results.')
-        if matches[0].get('currency_code') != 'ZAR':
-            raise ValueError('Client currency must be ZAR.')
+        currency = self.tenant.currency
+        if matches[0].get('currency_code') != currency:
+            raise ValueError(f'Client currency must be {currency}.')
         return matches[0]
 
     def prepare_client(self, name, email, phone):
@@ -126,11 +127,12 @@ class ClientWorkflows:
             if self.matches(c, phone) or any(p.get('email', '').casefold() == email.casefold() for p in [c] + people):
                 return {'existing_client': c, 'created': False}
         currencies = list(self.api.pages('settings/currencies', 'currencies'))
-        zar = next((c for c in currencies if c['currency_code'] == 'ZAR'), None)
+        currency = self.tenant.currency
+        zar = next((c for c in currencies if c['currency_code'] == currency), None)
         if not zar:
-            raise ValueError('ZAR is not configured in Zoho.')
+            raise ValueError(f'{currency} is not configured in Zoho.')
         payload = {'contact_name': name.strip(), 'contact_type': 'customer',
-                   'currency_id': str(zar['currency_id']), 'payment_terms': 7,
+                   'currency_id': str(zar['currency_id']), 'payment_terms': self.tenant.payment_terms_days,
                    'contact_persons': [{'first_name': name.strip(), 'email': email,
                                         'mobile': phone, 'is_primary_contact': True}]}
         return self.proposal('client', payload, payload)

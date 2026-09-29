@@ -49,8 +49,8 @@ class InvoiceCreation:
         invoice = self.api.get('invoices/' + identifier(invoice_id))['invoice']
         if str(invoice['customer_id']) != str(customer['contact_id']):
             raise ValueError('Invoice does not belong to this client.')
-        if invoice.get('currency_code') != 'ZAR':
-            raise ValueError('Invoice currency must be ZAR.')
+        if invoice.get('currency_code') != self.tenant.currency:
+            raise ValueError(f'Invoice currency must be {self.tenant.currency}.')
         return invoice
 
     def prepare_invoice(self, phone, lines, invoice_date, contact_id=''):
@@ -101,7 +101,8 @@ class InvoiceCreation:
             raise ValueError('Supply 1–100 invoice lines.')
         # vat_registered False means the business may not show VAT at all.
         # Missing means unknown: keep requiring an explicit tax decision per line.
-        unregistered = self.workflow_config.get('vat_registered') is False
+        tenant = self.tenant
+        unregistered = tenant.vat_registered is False
         taxes = {} if unregistered else {str(t['tax_id']): t for t in self.api.get('settings/taxes')['taxes']}
         prepared = []
         total = Decimal('0')
@@ -136,9 +137,10 @@ class InvoiceCreation:
         no_tax_note = ('Not VAT-registered; no VAT shown' if unregistered
                        else 'No tax applied; explicitly requested')
         payload = {'customer_id': str(customer['contact_id']), 'date': day.isoformat(),
-                   'due_date': (day + timedelta(days=7)).isoformat(), 'payment_terms': 7,
+                   'due_date': (day + timedelta(days=tenant.payment_terms_days)).isoformat(),
+                   'payment_terms': tenant.payment_terms_days,
                    'is_inclusive_tax': not unregistered, 'line_items': prepared,
                    'send': False}
         return payload, {'customer_name': customer['contact_name'],
-                             'currency': 'ZAR', 'estimated_total': str(total.quantize(Decimal('.01'))),
+                             'currency': tenant.currency, 'estimated_total': str(total.quantize(Decimal('.01'))),
                              'taxes': [taxes[l['tax_id']] if l.get('tax_id') else {'treatment': no_tax_note} for l in prepared], 'invoice': payload}

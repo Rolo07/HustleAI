@@ -259,7 +259,7 @@ class McpGateTests(unittest.TestCase):
     def test_confirm_tools_refuse_when_gateway_configured(self):
         from hustleai.mcp import owner_server
         with patch.object(owner_server, 'gateway_confirms', return_value=True):
-            with self.assertRaisesRegex(ValueError, 'business WhatsApp number himself'):
+            with self.assertRaisesRegex(ValueError, 'business WhatsApp number themselves'):
                 owner_server.confirm_operation('a' * 32, 'CONFIRM ' + 'a' * 32)
             with self.assertRaisesRegex(ValueError, 'APPROVE'):
                 owner_server.approve_invoice_version('b' * 32, 'APPROVE ' + 'b' * 32)

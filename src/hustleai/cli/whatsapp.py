@@ -20,6 +20,7 @@ from hustleai.integrations.whatsapp import config as wa_config
 from hustleai.integrations.whatsapp.client import WhatsAppClient
 from hustleai.storage.backend import open_repository
 from hustleai.storage.files import private_write
+from hustleai.tenant import load_tenant
 
 
 def ask(label, current='', secret=False):
@@ -35,7 +36,7 @@ def setup(args):
     settings = json.loads(path.read_text()) if path.exists() else {}
     settings['business_number'] = args.business_number or ask('Business WhatsApp number (+27...)', settings.get('business_number', ''))
     settings['phone_number_id'] = args.phone_number_id or ask('Meta phone number ID (digits)', settings.get('phone_number_id', ''))
-    settings['owner_number'] = args.owner_number or settings.get('owner_number') or wa_config.DEFAULT_OWNER
+    settings['owner_number'] = args.owner_number or settings.get('owner_number') or ''
     settings['access_token'] = ask('Permanent access token', settings.get('access_token', ''), secret=True)
     settings['app_secret'] = ask('Meta app secret', settings.get('app_secret', ''), secret=True)
     settings['verify_token'] = settings.get('verify_token') or secrets.token_urlsafe(24)
@@ -78,7 +79,7 @@ def send_test(_args):
     settings = wa_config.load(ROOT)
     session = store()
     try:
-        rows = Outbox(session, WhatsAppClient(settings), settings).send_text(
+        rows = Outbox(session, WhatsAppClient(settings), settings, load_tenant(ROOT).zone).send_text(
             'test', f'test:{int(time.time())}', settings['owner_number'], 'HustleAI gateway test message.')
     finally:
         session.close()
@@ -98,10 +99,11 @@ def build_gateway(settings):
     from hustleai.workflows.outbox import Outbox
     from hustleai.workflows.service import Service
     client = WhatsAppClient(settings)
+    zone = load_tenant(ROOT).zone
     agent = OwnerAgent(settings['owner_agent']) if settings['owner_agent'].get('url') else None
 
     def process(session, event):
-        MessageRouter(session, Outbox(session, client, settings), settings, Service, agent).handle(event)
+        MessageRouter(session, Outbox(session, client, settings, zone), settings, Service, agent, zone).handle(event)
 
     return Gateway(settings, store, process)
 
@@ -109,6 +111,7 @@ def build_gateway(settings):
 def serve(_args):
     """Run the gateway until stopped."""
     from hustleai.integrations.whatsapp.server import serve as run_server
+    load_tenant(ROOT).require('whatsapp')
     settings = wa_config.load(ROOT)
     run_server(build_gateway(settings), settings['host'], settings['port'])
 
@@ -120,7 +123,7 @@ def main(argv=None):
     configure = sub.add_parser('setup', help='Enter or update WhatsApp settings')
     configure.add_argument('--business-number', help='Business number, e.g. +27821234567')
     configure.add_argument('--phone-number-id', help="Meta's numeric phone number ID")
-    configure.add_argument('--owner-number', help=f'Owner number (default {wa_config.DEFAULT_OWNER})')
+    configure.add_argument('--owner-number', help="Owner number (default: the tenant's owner_number)")
     configure.add_argument('--template', help='Approved template for messages outside the 24-hour window')
     configure.add_argument('--template-language', default='en', help='Template language code (default en)')
     configure.add_argument('--agent-url', help='Optional OpenAI-compatible chat URL for owner free text')

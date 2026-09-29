@@ -1,7 +1,7 @@
 """Owner-side reorder reads, draft revisions and version-bound delivery approvals.
 
 This module adds capabilities to Service without exposing a customer-authenticated
-endpoint. A trusted gateway must still authenticate Roland. Approval records do
+endpoint. A trusted gateway must still authenticate the owner. Approval records do
 not send WhatsApp messages or mark invoices sent.
 """
 from contextlib import contextmanager
@@ -125,8 +125,7 @@ class InvoiceWorkflows:
         remote write is made. Historical totals are not current order quotes.
         """
         customer = self.customer(phone, contact_id)
-        config = self.workflow_config
-        excluded = set(map(str, config.get('test_invoice_ids', [])))
+        excluded = set(self.tenant.test_invoice_ids)
         candidates = []
         summaries = self.api.pages('invoices?customer_id=' + str(customer['contact_id']), 'invoices')
         for summary in summaries:
@@ -140,11 +139,11 @@ class InvoiceWorkflows:
                 continue
             candidates.append((date.fromisoformat(inv['date']), inv))
         if not candidates:
-            raise ValueError('No eligible previous order. Ask Roland; drafts, void and known tests are excluded.')
+            raise ValueError(f'No eligible previous order. Ask {self.tenant.owner_name}; drafts, void and known tests are excluded.')
         latest_date = max(d for d, _ in candidates)
         latest = [inv for d, inv in candidates if d == latest_date]
         if len(latest) != 1:
-            raise ValueError('Several invoices share the latest date. Ask Roland to select source_invoice_id.')
+            raise ValueError(f'Several invoices share the latest date. Ask {self.tenant.owner_name} to select source_invoice_id.')
         inv = latest[0]
         lines = []
         blockers = []
@@ -157,7 +156,7 @@ class InvoiceWorkflows:
             else:
                 if item.get('status') != 'active':
                     line_issues.append('Product is not active.')
-                if config.get('vat_registered') is not False:
+                if self.tenant.vat_registered is not False:
                     if not item.get('tax_id'):
                         line_issues.append('No configured product tax; resolve tax treatment explicitly.')
                     line_issues.append('Confirm whether catalog rate includes VAT before using it.')
@@ -276,8 +275,8 @@ class InvoiceWorkflows:
         """Persist owner approval for one exact invoice/PDF/recipient version.
 
         Args:
-            review_id: ID returned with the PDF Roland reviewed.
-            owner_confirmation: Exact 'APPROVE <review_id>' reply from Roland.
+            review_id: ID returned with the PDF the owner reviewed.
+            owner_confirmation: Exact 'APPROVE <review_id>' reply from the owner.
         Returns: Validated local approval record. No WhatsApp send or Zoho write.
         Raises: ValueError if text, ownership, expiry or version checks fail.
 
@@ -285,7 +284,7 @@ class InvoiceWorkflows:
         or the owner MCP server to customer conversations.
         """
         if owner_confirmation.strip() != 'APPROVE ' + review_id:
-            raise ValueError('Relay Roland’s exact APPROVE reply for the current review.')
+            raise ValueError(f'Relay {self.tenant.owner_name}’s exact APPROVE reply for the current review.')
         saved = self.store.review(review_id)
         if not saved:
             raise ValueError('Unknown review.')

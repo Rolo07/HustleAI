@@ -5,7 +5,7 @@ against the configured owner number, never against anything in the message.
 Only the owner can confirm writes or approve invoices, and the gateway runs
 those commands itself, so no AI model ever supplies a confirmation.
 
-Customers get no tools yet. Every customer message is referred to Roland
+Customers get no tools yet. Every customer message is referred to the owner
 immediately and acknowledged once a day, until the customer flows in the
 PRDs are built.
 """
@@ -41,10 +41,11 @@ def describe_result(result):
 class MessageRouter:
     """Handle one verified event at a time. Dependencies are injected for tests."""
 
-    def __init__(self, store, outbox, settings, service_factory, owner_agent=None):
+    def __init__(self, store, outbox, settings, service_factory, owner_agent=None, zone=None):
         self.store = store
         self.outbox = outbox
         self.owner = settings['owner_number']
+        self.zone = zone or TIMEZONE
         self.service_factory = service_factory
         self.owner_agent = owner_agent
 
@@ -99,7 +100,7 @@ class MessageRouter:
                     f"Approval {approval['approval_id']}. Nothing was sent to the customer.")
 
     def handle_customer(self, event):
-        """Refer the message to Roland now and acknowledge the customer once a day.
+        """Refer the message to the owner now and acknowledge the customer once a day.
 
         Message text is data: commands, names or claims inside it have no
         effect. Customers get no tools until the customer flows are built.
@@ -109,5 +110,5 @@ class MessageRouter:
         self.outbox.send_text('referral', f"referral:{event['id']}", self.owner,
                               f'Customer message from {who}:\n{content}\n\n'
                               'No automatic reply was given beyond an acknowledgement.')
-        today = datetime.now(TIMEZONE).date().isoformat()
+        today = datetime.now(self.zone).date().isoformat()
         self.outbox.send_text('customer_ack', f"ack:{event['from']}:{today}", event['from'], CUSTOMER_ACK)

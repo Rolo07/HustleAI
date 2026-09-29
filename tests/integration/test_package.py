@@ -46,5 +46,22 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [])
 
 
+    def test_mcp_registers_only_enabled_features(self):
+        """A tenant with only invoicing enabled gets exactly the 14 invoicing tools."""
+        async def check(directory):
+            parameters = StdioServerParameters(command=sys.executable,
+                args=['-m', 'hustleai.mcp.owner_server'], env={'HUSTLEAI_DATA_DIR': directory})
+            async with stdio_client(parameters) as (read, write):
+                async with ClientSession(read, write) as client:
+                    await client.initialize()
+                    names = {t.name for t in (await client.list_tools()).tools}
+                    self.assertEqual(len(names), 14)
+                    self.assertNotIn('reorder_forecast', names)
+                    self.assertNotIn('send_pdf_to_owner', names)
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'tenant.json').write_text('{"features": ["invoicing"], "owner_name": "Thandi"}')
+            asyncio.run(check(directory))
+
+
 if __name__ == '__main__':
     unittest.main()

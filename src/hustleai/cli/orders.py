@@ -32,6 +32,7 @@ def main(argv=None):
     sub.add_parser('status', help='Show the last sync')
     args = parser.parse_args(argv)
     with Service() as service:
+        service.tenant.require('orders_sync')
         if args.command == 'sync':
             print(describe(service.sync_orders(args.reserve)))
         else:
