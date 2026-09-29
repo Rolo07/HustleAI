@@ -28,6 +28,15 @@ code, sets up RG Midrand as tenant `rg-midrand`, installs Hermes with its
 profile and scheduled jobs, and starts the WhatsApp gateway behind HTTPS. Run
 it again at any time to update or change a setting: finished steps are skipped.
 
+**Hermes already installed?** The installer finds the user that owns
+`~/.hermes` and runs HustleAI as that user, reusing the same Hermes. It
+doesn't reinstall Hermes or ask for the AI model again unless you choose to.
+Don't connect RG Midrand's business number to Hermes's own WhatsApp
+adapter, because the HustleAI gateway must own that number. The installer also asks
+before turning on the firewall or changing the timezone. If another web
+server already uses ports 80/443, it leaves that server alone and tells you
+what to forward.
+
 The manual steps below explain what it does.
 
 ## Manual layout

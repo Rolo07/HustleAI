@@ -8,17 +8,18 @@
 # Have these ready (a phone browser is enough):
 #   - Zoho: organization ID, and a Self Client at https://api-console.zoho.com
 #   - Supabase: Session pooler connection string and the database password
-#   - An API key for the AI model Hermes will use
+#   - An API key for the AI model Hermes will use (skipped if Hermes is set up)
 #   - Meta WhatsApp: phone number ID, permanent access token, app secret
 #   - A domain name pointing at this server
 # Safe to run again: finished steps are skipped and the code is updated.
+# Works on a server that already runs Hermes: it reuses that user and install,
+# and asks before changing the firewall, timezone or an existing web server.
 set -euo pipefail
 
 REPO="https://github.com/Rolo07/HustleAI.git"
 APP=/opt/hustleai
 DATA=/var/lib/hustleai
 TENANTS=$DATA/tenants
-USER_NAME=hermes
 SLUG=rg-midrand
 BIN=$APP/.venv/bin
 
@@ -32,12 +33,29 @@ confirm() { [[ "$(ask "$1 [y/N] ")" =~ ^[Yy] ]]; }
 [[ $EUID -eq 0 ]] || die "Run as root: sudo bash install.sh"
 command -v apt-get >/dev/null || die "This installer supports Ubuntu/Debian only."
 
+# Reuse the user that already runs Hermes, if any; otherwise create "hermes".
+EXISTING=()
+while IFS=: read -r name _ _ _ _ home _; do
+  if [[ -n $home && -d $home/.hermes ]]; then EXISTING+=("$name"); fi
+done < <(getent passwd)
+if [[ ${#EXISTING[@]} -eq 1 ]]; then
+  USER_NAME=${EXISTING[0]}
+  echo "Hermes is already installed for user '$USER_NAME'; HustleAI will run as that user."
+elif [[ ${#EXISTING[@]} -gt 1 ]]; then
+  USER_NAME=$(ask "Hermes exists for several users (${EXISTING[*]}). Which one should run HustleAI? ")
+else
+  USER_NAME=hermes
+fi
+[[ -n $USER_NAME ]] || die "No user chosen."
+
+user_home() { getent passwd "$USER_NAME" | cut -d: -f6; }
+
 # Run a command as the service user with its own home, PATH and systemd user bus.
 as_user() {
-  local uid; uid=$(id -u "$USER_NAME")
-  (cd "/home/$USER_NAME" && sudo -u "$USER_NAME" -H env \
-    HOME="/home/$USER_NAME" \
-    PATH="/home/$USER_NAME/.local/bin:$BIN:/usr/local/bin:/usr/bin:/bin" \
+  local uid home; uid=$(id -u "$USER_NAME"); home=$(user_home)
+  (cd "$home" && sudo -u "$USER_NAME" -H env \
+    HOME="$home" \
+    PATH="$home/.local/bin:$BIN:/usr/local/bin:/usr/bin:/bin" \
     XDG_RUNTIME_DIR="/run/user/$uid" \
     DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     HUSTLEAI_TENANTS_ROOT="$TENANTS" \
@@ -47,18 +65,41 @@ as_user() {
 step "1/7 System packages, timezone and firewall"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -y -q python3-venv python3-dev git curl build-essential caddy >/dev/null
-timedatectl set-timezone Africa/Johannesburg
+apt-get install -y -q python3-venv python3-dev git curl build-essential >/dev/null
+# HTTPS: use Caddy unless another web server already holds port 80 or 443.
+OTHER_WEB=$(ss -ltnpH '( sport = :80 or sport = :443 )' 2>/dev/null | grep -v caddy || true)
+if [[ -n $OTHER_WEB ]]; then
+  PROXY=manual
+  warn "Another web server is using port 80/443, so Caddy won't be installed."
+else
+  PROXY=caddy
+  apt-get install -y -q caddy >/dev/null
+fi
+ZONE=$(timedatectl show -p Timezone --value)
+if [[ $ZONE != Africa/Johannesburg ]] && confirm "Server timezone is $ZONE. Change it to Africa/Johannesburg (recommended for the schedules)?"; then
+  timedatectl set-timezone Africa/Johannesburg
+fi
 if command -v ufw >/dev/null; then
-  ufw allow OpenSSH >/dev/null && ufw allow 80 >/dev/null && ufw allow 443 >/dev/null && ufw --force enable >/dev/null
+  if ufw status | grep -q "Status: active"; then
+    ufw allow 80/tcp >/dev/null && ufw allow 443/tcp >/dev/null
+    ok "Firewall already on; opened ports 80 and 443."
+  else
+    SSH_PORT=$(ss -ltnpH 2>/dev/null | grep -m1 sshd | awk '{print $4}' | sed 's/.*://' || true)
+    if confirm "Turn on the firewall allowing only SSH (port ${SSH_PORT:-22}), 80 and 443?"; then
+      ufw allow "${SSH_PORT:-22}/tcp" >/dev/null && ufw allow 80/tcp >/dev/null && ufw allow 443/tcp >/dev/null
+      ufw --force enable >/dev/null
+    fi
+  fi
 fi
 ok "Packages installed; timezone $(timedatectl show -p Timezone --value)."
 
 step "2/7 Service user and folders"
 id "$USER_NAME" >/dev/null 2>&1 || adduser --disabled-password --gecos "" "$USER_NAME" >/dev/null
 loginctl enable-linger "$USER_NAME"
+USER_HOME=$(user_home)
+GROUP_NAME=$(id -gn "$USER_NAME")
 mkdir -p "$APP" "$TENANTS"
-chown "$USER_NAME:$USER_NAME" "$APP" "$DATA" "$TENANTS"
+chown "$USER_NAME:$GROUP_NAME" "$APP" "$DATA" "$TENANTS"
 chmod 700 "$DATA" "$TENANTS"
 ok "User $USER_NAME; code in $APP; private data in $DATA."
 
@@ -71,8 +112,8 @@ fi
 [[ -x $BIN/python ]] || as_user python3 -m venv "$APP/.venv"
 as_user "$BIN/pip" install -q --upgrade pip
 as_user "$BIN/pip" install -q -e "$APP[postgres,hermes]"
-grep -q "$BIN" "/home/$USER_NAME/.bashrc" 2>/dev/null || \
-  echo "export PATH=$BIN:\$PATH HUSTLEAI_TENANTS_ROOT=$TENANTS" >> "/home/$USER_NAME/.bashrc"
+grep -q "$BIN" "$USER_HOME/.bashrc" 2>/dev/null || \
+  echo "export PATH=$BIN:\$PATH HUSTLEAI_TENANTS_ROOT=$TENANTS" >> "$USER_HOME/.bashrc"
 ok "Installed $(as_user git -C "$APP" log --oneline -1)."
 
 step "4/7 Business details, database and Zoho"
@@ -82,14 +123,20 @@ as_user "$BIN/hustleai-tenant" bootstrap "$SLUG" </dev/tty
 as_user env HUSTLEAI_DATA_DIR="$TENANT_DIR" "$BIN/hustleai-orders" status || warn "Orders not synced yet; the nightly job will do it."
 
 step "5/7 Hermes Agent"
-if ! as_user bash -c 'command -v hermes' >/dev/null; then
+if as_user bash -c 'command -v hermes' >/dev/null; then
+  ok "Using the Hermes already installed for $USER_NAME."
+  if grep -qs '^WHATSAPP' "$USER_HOME/.hermes/.env"; then
+    warn "Hermes has its own WhatsApp settings. Don't use RG Midrand's business number there:"
+    warn "the HustleAI gateway must own that number's webhook."
+  fi
+  if confirm "Choose Hermes's AI model/provider again?"; then
+    as_user hermes model </dev/tty
+  fi
+else
   echo "Installing Hermes (its own setup may ask you questions)..."
   as_user bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash' </dev/tty
-fi
-as_user bash -c 'command -v hermes' >/dev/null || die "Hermes did not install. Check the output above, then rerun this installer."
-if [[ ! -f /home/$USER_NAME/.hermes/.hustleai-model-set ]] || confirm "Choose the AI model/provider for Hermes again?"; then
+  as_user bash -c 'command -v hermes' >/dev/null || die "Hermes did not install. Check the output above, then rerun this installer."
   as_user hermes model </dev/tty
-  as_user touch "/home/$USER_NAME/.hermes/.hustleai-model-set"
 fi
 as_user "$BIN/hustleai-tenant" hermes-install "$SLUG"
 as_user hermes gateway install </dev/tty || warn "hermes gateway install failed; run it later as $USER_NAME."
@@ -111,21 +158,38 @@ fi
 
 step "7/7 Gateway service and HTTPS"
 if [[ -f $TENANT_DIR/.whatsapp.json ]]; then
-  cp "$APP/deploy/schedule/hustleai-gateway.service" /etc/systemd/system/
+  sed "s/^User=hermes$/User=$USER_NAME/" "$APP/deploy/schedule/hustleai-gateway.service" \
+    > /etc/systemd/system/hustleai-gateway.service
   systemctl daemon-reload
   systemctl enable --now hustleai-gateway >/dev/null
   systemctl restart hustleai-gateway
-  DOMAIN=$(grep -oE '^[a-z0-9.-]+\.[a-z]+ \{' /etc/caddy/Caddyfile 2>/dev/null | head -1 | cut -d' ' -f1 || true)
-  if [[ -z $DOMAIN || $DOMAIN == hustleai.example.com ]]; then
-    DOMAIN=$(ask "Domain pointing at this server (e.g. hustle.yourdomain.co.za): ")
+  DOMAIN=$(cat "$DATA/domain" 2>/dev/null || true)
+  [[ -n $DOMAIN ]] || DOMAIN=$(ask "Domain pointing at this server (e.g. hustle.yourdomain.co.za): ")
+  echo "$DOMAIN" > "$DATA/domain"
+  if [[ $PROXY == caddy ]]; then
+    CADDY=/etc/caddy/Caddyfile
+    BLOCK=$(sed "s/hustleai.example.com/$DOMAIN/" "$APP/deploy/Caddyfile.example")
+    if grep -qs 'HustleAI' "$CADDY"; then
+      ok "Caddy already has the HustleAI site."
+    elif [[ -f $CADDY ]] && ! grep -qs 'file_server' "$CADDY"; then
+      # A customised Caddyfile: keep its sites and add ours after a backup.
+      cp "$CADDY" "$CADDY.bak.$(date +%s)"
+      printf '\n# --- HustleAI ---\n%s\n' "$BLOCK" >> "$CADDY"
+    else
+      # Only Ubuntu's default welcome page: replace it.
+      printf '# --- HustleAI ---\n%s\n' "$BLOCK" > "$CADDY"
+    fi
+    caddy validate --config "$CADDY" --adapter caddyfile >/dev/null 2>&1 || die "Caddy config invalid; check $CADDY (a backup was kept)."
+    systemctl reload caddy || systemctl restart caddy
+  else
+    warn "Configure your existing web server to forward https://$DOMAIN/webhook* and /health"
+    warn "to http://127.0.0.1:8085 (see $APP/deploy/Caddyfile.example)."
   fi
-  sed "s/hustleai.example.com/$DOMAIN/" "$APP/deploy/Caddyfile.example" > /etc/caddy/Caddyfile
-  systemctl reload caddy || systemctl restart caddy
   sleep 3
   if curl -fsS "https://$DOMAIN/health" >/dev/null 2>&1; then
     ok "https://$DOMAIN/health is ok."
   else
-    warn "https://$DOMAIN/health not reachable yet. Check DNS points here, then: journalctl -u caddy -n 50"
+    warn "https://$DOMAIN/health not reachable yet. Check DNS points here and the web server forwards to port 8085."
   fi
   VERIFY=$(python3 -c "import json;print(json.load(open('$TENANT_DIR/.whatsapp.json'))['verify_token'])")
   printf '\n\033[1mIn the Meta app (WhatsApp > Configuration):\033[0m\n'
