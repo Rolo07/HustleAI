@@ -314,7 +314,7 @@ class PostgresTests(WorkflowTests):
 
     def test_provision_tenant_maps_one_organization(self):
         from psycopg import sql
-        from hustleai.storage.postgres.migrate import provision_tenant, tenant_role_name
+        from hustleai.storage.postgres.migrate import organization_login, provision_tenant, tenant_role_name
         slug = 'test-' + uuid.uuid4().hex[:8]
         role = tenant_role_name(slug)
         settings = json.loads((ROOT / '.supabase-credentials.json').read_text())
@@ -329,9 +329,16 @@ class PostgresTests(WorkflowTests):
                     provision_tenant(self.admin, settings, second, 'other-' + slug, '789', self.schema)
                 attributes = self.admin.execute('SELECT rolinherit, rolbypassrls FROM pg_roles WHERE rolname=%s', (role,)).fetchone()
                 self.assertEqual(attributes, (True, False))
+                # Moving the organization to a new server login unmaps the old one.
+                with tempfile.TemporaryDirectory() as second:
+                    moved = provision_tenant(self.admin, settings, second, 'moved-' + slug, '789', self.schema, reassign=True)
+                    self.assertEqual(organization_login(self.admin, '789', self.schema), moved)
+                    self.assertIsNone(self.admin.execute(f'SELECT 1 FROM {self.schema}.tenant_roles WHERE role_name=%s', (role,)).fetchone())
             finally:
-                self.admin.execute(f'DELETE FROM {self.schema}.tenant_roles WHERE role_name=%s', (role,))
-                self.admin.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(role)))
+                moved_role = tenant_role_name('moved-' + slug)
+                self.admin.execute(f'DELETE FROM {self.schema}.tenant_roles WHERE role_name = ANY(%s)', ([role, moved_role],))
+                for name in (role, moved_role):
+                    self.admin.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(name)))
 
     def test_database_rejects_expired_claim(self):
         oid = self.s.proposal('invoice', {}, {})['operation_id']

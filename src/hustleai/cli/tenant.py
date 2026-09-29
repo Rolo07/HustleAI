@@ -5,6 +5,7 @@
   hustleai-tenant import-legacy <slug> --from <old data folder> --name ... --owner-name ...
   hustleai-tenant hermes-install <slug> [--dry-run]
   hustleai-tenant run-job <slug> orders-sync|forecast
+  hustleai-tenant bootstrap <slug>     ask for every setting and secret on this server
 
 Each tenant is a private folder under HUSTLEAI_TENANTS_ROOT (default
 /var/lib/hustleai/tenants) holding tenant.json and its own secrets.
@@ -284,6 +285,176 @@ def hermes_install(slug, hermes='hermes', hermes_root=None, tenants_root=None, d
     return commands
 
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ZOHO_REGIONS = {'com': 'https://accounts.zoho.com', 'eu': 'https://accounts.zoho.eu',
+                'in': 'https://accounts.zoho.in', 'com.au': 'https://accounts.zoho.com.au',
+                'jp': 'https://accounts.zoho.jp', 'ca': 'https://accounts.zohocloud.ca',
+                'sa': 'https://accounts.zoho.sa'}
+ZOHO_API = {'com': 'https://www.zohoapis.com', 'eu': 'https://www.zohoapis.eu', 'in': 'https://www.zohoapis.in',
+            'com.au': 'https://www.zohoapis.com.au', 'jp': 'https://www.zohoapis.jp',
+            'ca': 'https://www.zohoapis.ca', 'sa': 'https://www.zohoapis.sa'}
+
+
+def prompt(label, default='', secret=False, required=True):
+    """Ask one question; Enter accepts the default. Secrets are hidden."""
+    from getpass import getpass
+    shown = ' [saved]' if secret and default else (f' [{default}]' if default else '')
+    while True:
+        value = (getpass if secret else input)(f'{label}{shown}: ').strip() or default
+        if value or not required:
+            return value
+        print('  This value is required.')
+
+
+def agree(label, default=False):
+    """Ask a yes/no question."""
+    answer = input(f"{label} [{'Y/n' if default else 'y/N'}]: ").strip().lower()
+    return default if not answer else answer.startswith('y')
+
+
+def zoho_exchange(accounts_url, client_id, client_secret, code):
+    """Exchange a Self Client grant code for tokens; raise ValueError on failure."""
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    from hustleai.integrations.zoho.auth import tls_context
+    body = urllib.parse.urlencode({'client_id': client_id, 'client_secret': client_secret, 'code': code,
+                                   'grant_type': 'authorization_code'}).encode()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(accounts_url + '/oauth/v2/token', data=body),
+                                    context=tls_context(), timeout=30) as response:
+            result = json.load(response)
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        raise ValueError('Could not reach Zoho or read its reply. Generate a fresh code and try again.') from None
+    if not result.get('refresh_token'):
+        raise ValueError('Zoho gave no refresh token (' + str(result.get('error') or 'unknown error')
+                         + '). Codes expire after 10 minutes and work once; generate a fresh one.')
+    return result
+
+
+def bootstrap_business(slug, folder):
+    """Ask for the business settings and save tenant.json (step 1)."""
+    current = read_settings(folder) if (folder / TENANT_FILE).exists() else {}
+    if current and not agree('Business settings exist. Change them?'):
+        return current
+    defaults = {'name': 'RG Midrand', 'owner_name': 'Roland', 'owner_number': '+27837758811',
+                'organization_id': '', 'currency': 'ZAR', 'timezone': 'Africa/Johannesburg',
+                'payment_terms_days': 7, 'vat_registered': False, **current}
+    print('\n1. Business details')
+    settings = dict(current)
+    settings['name'] = prompt('Business name', defaults['name'])
+    settings['owner_name'] = prompt("Owner's first name (used in messages)", defaults['owner_name'])
+    settings['owner_number'] = prompt("Owner's WhatsApp number", defaults['owner_number'])
+    settings['organization_id'] = prompt('Zoho organization ID (Zoho Invoice > Settings > Organization profile)',
+                                         defaults['organization_id'])
+    settings['currency'] = prompt('Invoice currency', defaults['currency'])
+    settings['timezone'] = prompt('Timezone', defaults['timezone'])
+    settings['payment_terms_days'] = int(prompt('Days until invoices are due', str(defaults['payment_terms_days'])))
+    settings['vat_registered'] = agree('Is the business VAT-registered?', defaults['vat_registered'] is True)
+    settings.setdefault('storage_backend', 'postgres')
+    settings.setdefault('features', list(FEATURES))
+    Tenant.from_settings(settings, slug=slug)
+    make_private_folder(folder)
+    private_write(folder / TENANT_FILE, json.dumps(settings, indent=2) + '\n')
+    print(f'  Saved {folder / TENANT_FILE}.')
+    return settings
+
+
+def bootstrap_database(slug, folder, organization, admin_dir, ca_cert):
+    """Connect to Supabase as admin, apply upgrades and create the tenant login (step 2)."""
+    from hustleai.cli.supabase_setup import connection_fields
+    from hustleai.storage.postgres.migrate import organization_login, provision_tenant, tenant_role_name
+    from hustleai.storage.postgres.repository import connect
+    from hustleai.storage.postgres.upgrade import apply_upgrades
+    if (folder / '.supabase-runtime.json').exists() and not agree('This business already has a database login. Recreate it?'):
+        return
+    (folder / '.supabase-runtime.json').unlink(missing_ok=True)
+    print('\n2. Supabase database')
+    print('  In Supabase: Project > Connect > Session pooler. Copy the URI (it has [YOUR-PASSWORD] in it).')
+    admin_file = admin_dir / '.supabase-credentials.json'
+    saved = json.loads(admin_file.read_text()) if admin_file.exists() else {}
+    if saved and agree('Use the saved database admin login?', True):
+        fields = saved
+    else:
+        uri = prompt('Session pooler URI', secret=True)
+        password = prompt('Database password', secret=True)
+        fields = connection_fields(uri, password)
+    fields['sslrootcert'] = str(ca_cert)
+    make_private_folder(admin_dir)
+    private_write(admin_file, json.dumps(fields, indent=2) + '\n')
+    try:
+        admin = connect(admin_dir, '.supabase-credentials.json')
+    except ValueError:
+        admin_file.unlink(missing_ok=True)
+        raise ValueError('Could not connect to Supabase with those details. Nothing was saved.') from None
+    with admin:
+        applied = apply_upgrades(admin, REPO_ROOT / 'supabase' / 'migrations')
+        print('  Schema: ' + ('applied ' + ', '.join(applied) if applied else 'up to date') + '.')
+        role = tenant_role_name(slug)
+        owner = organization_login(admin, organization)
+        reassign = False
+        if owner and owner != role:
+            print(f'  Organization {organization} is currently used by the database login "{owner}"'
+                  ' (the old single-server install, e.g. the Mac).')
+            if not agree('  Move it to this server? The old login will lose access to its data.'):
+                raise ValueError('Stopped: the organization stays with the old login.')
+            reassign = True
+        provision_tenant(admin, fields, folder, slug, organization, reassign=reassign)
+    print(f'  Database login {role} created; it can only see organization {organization}.')
+    if not agree('Keep the database admin login on this server? (only needed to add businesses or apply upgrades)'):
+        admin_file.unlink(missing_ok=True)
+        print('  Admin login removed from this server.')
+
+
+def bootstrap_zoho(folder, organization):
+    """Connect Zoho with a fresh Self Client code and verify it (step 3)."""
+    from hustleai.cli.upgrade import SCOPES
+    from hustleai.integrations.zoho.client import Client
+    path = folder / '.zoho-credentials.json'
+    if path.exists() and not agree('Zoho is already connected. Reconnect it?'):
+        return
+    print('\n3. Zoho Invoice')
+    print('  In a browser (a phone works): https://api-console.zoho.com > your Self Client.')
+    print('  Client Secret tab: copy the Client ID and Client Secret.')
+    print('  Generate Code tab: paste these scopes, choose 10 minutes, and create a code:')
+    print('  ' + SCOPES)
+    region = prompt('Zoho data centre (' + ', '.join(ZOHO_REGIONS) + ')', 'com')
+    if region not in ZOHO_REGIONS:
+        raise ValueError('Unknown Zoho data centre.')
+    client_id = prompt('Client ID', secret=True)
+    client_secret = prompt('Client Secret', secret=True)
+    code = prompt('Generated code', secret=True)
+    result = zoho_exchange(ZOHO_REGIONS[region], client_id, client_secret, code)
+    credentials = {'client_id': client_id, 'client_secret': client_secret, 'refresh_token': result['refresh_token'],
+                   'accounts_url': ZOHO_REGIONS[region], 'api_domain': result.get('api_domain', ZOHO_API[region])}
+    private_write(path, json.dumps(credentials, indent=2) + '\n')
+    try:
+        Client(organization, folder).get('contacts?per_page=1')
+    except ValueError as error:
+        raise ValueError(f'Zoho connected, but reading organization {organization} failed: {error}') from None
+    print('  Zoho connected and verified.')
+
+
+def bootstrap_command(args, ca_cert=None, admin_dir=None):
+    """Ask for everything a business needs on this server, verifying each part."""
+    folder = tenant_dir(args.slug)
+    make_private_folder(folder)
+    settings = bootstrap_business(args.slug, folder)
+    ca_cert = Path(ca_cert or REPO_ROOT / 'prod-ca-2021.crt')
+    if not ca_cert.is_file():
+        raise ValueError(f'Supabase CA certificate not found at {ca_cert}.')
+    bootstrap_database(args.slug, folder, settings['organization_id'], Path(admin_dir or TENANTS_ROOT.parent / 'admin'), ca_cert)
+    bootstrap_zoho(folder, settings['organization_id'])
+    tenant = load_tenant(folder, slug=args.slug)
+    if not tenant.forecast_start_date:
+        from hustleai.workflows.forecast import local_today
+        data = json.loads((folder / TENANT_FILE).read_text())
+        data['forecast_start_date'] = local_today(zone=tenant.zone).isoformat()
+        private_write(folder / TENANT_FILE, json.dumps(data, indent=2) + '\n')
+        print(f"  Forecast counts orders from {data['forecast_start_date']}.")
+    print(f'\n{tenant.name} is set up in {folder}.')
+
+
 def main(argv=None):
     """Dispatch a tenant command."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -311,6 +482,8 @@ def main(argv=None):
     install.add_argument('slug')
     install.add_argument('--dry-run', action='store_true', help='Show what would change without changing anything')
     install.add_argument('--hermes', default='hermes', help='Path to the hermes command')
+    boot = sub.add_parser('bootstrap', help='Ask for every setting and secret for a business on this server')
+    boot.add_argument('slug')
     job = sub.add_parser('run-job', help='Run one scheduled job for one tenant')
     job.add_argument('slug')
     job.add_argument('job', choices=sorted(JOBS))
@@ -321,6 +494,8 @@ def main(argv=None):
         create_command(args)
     elif args.command == 'import-legacy':
         import_legacy_command(args)
+    elif args.command == 'bootstrap':
+        bootstrap_command(args)
     elif args.command == 'hermes-install':
         hermes_install(args.slug, hermes=args.hermes, dry_run=args.dry_run)
     else:
@@ -333,7 +508,7 @@ def run():
         main()
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         raise SystemExit(str(error)) from None
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         raise SystemExit('\nCancelled.') from None
 
 

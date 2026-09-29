@@ -2,24 +2,31 @@
 
 ## Quick install
 
-1. On the Mac, from the HustleAI folder, copy the private files that are kept out of Git:
+On the server, as root:
 
-   ```sh
-   ./deploy/send-to-vps.sh root@<server-ip>
-   ```
+```sh
+curl -fsSLO https://raw.githubusercontent.com/Rolo07/HustleAI/main/deploy/install.sh
+sudo bash install.sh
+```
 
-2. On the server:
+No other computer is needed. The installer asks for every ID, key and secret.
+Have these ready; a phone browser is enough:
 
-   ```sh
-   curl -fsSLO https://raw.githubusercontent.com/Rolo07/HustleAI/main/deploy/install.sh
-   sudo bash install.sh
-   ```
+- **Zoho:** the organization ID, plus the Client ID and Client Secret of a
+  Self Client at https://api-console.zoho.com. The installer shows the scopes
+  to paste when you generate its 10-minute code.
+- **Supabase:** Project, then Connect, then Session pooler. You need the
+  connection string and the database password. The installer creates this
+  server's own restricted login from them, and can move RG Midrand away from an
+  old login, such as the Mac's. Afterwards it asks whether to keep the admin login.
+- **The AI model** Hermes should use, and its API key.
+- **Meta WhatsApp:** the phone number ID, permanent access token and app secret.
+- **A domain** whose DNS points at the server.
 
-The installer sets the timezone and firewall and creates the `hermes` user. It
-installs the code, imports RG Midrand as tenant `rg-midrand`, and installs
-Hermes with its profile and scheduled jobs. It then asks for the WhatsApp
-details and starts the gateway behind HTTPS. It asks before anything that
-needs input. Run it again at any time to update: finished steps are skipped.
+It sets the timezone and firewall, creates the `hermes` user, installs the
+code, sets up RG Midrand as tenant `rg-midrand`, installs Hermes with its
+profile and scheduled jobs, and starts the WhatsApp gateway behind HTTPS. Run
+it again at any time to update or change a setting: finished steps are skipped.
 
 The manual steps below explain what it does.
 

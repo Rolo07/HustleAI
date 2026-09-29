@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# HustleAI installer for an Ubuntu VPS (tested target: Ubuntu 24.04).
+# HustleAI installer for an Ubuntu VPS (target: Ubuntu 24.04). Needs nothing
+# from any other computer: it asks for every ID, key and secret as it goes.
 #
 #   curl -fsSLO https://raw.githubusercontent.com/Rolo07/HustleAI/main/deploy/install.sh
 #   sudo bash install.sh
 #
-# Before running, copy RG Midrand's private files from the Mac with
-# deploy/send-to-vps.sh. Safe to run again: finished steps are skipped and
-# the code is updated. It asks before anything that needs your input.
+# Have these ready (a phone browser is enough):
+#   - Zoho: organization ID, and a Self Client at https://api-console.zoho.com
+#   - Supabase: Session pooler connection string and the database password
+#   - An API key for the AI model Hermes will use
+#   - Meta WhatsApp: phone number ID, permanent access token, app secret
+#   - A domain name pointing at this server
+# Safe to run again: finished steps are skipped and the code is updated.
 set -euo pipefail
 
 REPO="https://github.com/Rolo07/HustleAI.git"
@@ -15,7 +20,6 @@ DATA=/var/lib/hustleai
 TENANTS=$DATA/tenants
 USER_NAME=hermes
 SLUG=rg-midrand
-TRANSFER=/root/rg-transfer
 BIN=$APP/.venv/bin
 
 step() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
@@ -71,30 +75,10 @@ grep -q "$BIN" "/home/$USER_NAME/.bashrc" 2>/dev/null || \
   echo "export PATH=$BIN:\$PATH HUSTLEAI_TENANTS_ROOT=$TENANTS" >> "/home/$USER_NAME/.bashrc"
 ok "Installed $(as_user git -C "$APP" log --oneline -1)."
 
-step "4/7 RG Midrand data"
+step "4/7 Business details, database and Zoho"
 TENANT_DIR=$TENANTS/$SLUG
-if [[ -f $TENANT_DIR/tenant.json ]]; then
-  ok "Tenant $SLUG already exists; skipping import."
-else
-  [[ -d $TRANSFER ]] || die "No private files at $TRANSFER. On the Mac run: ./deploy/send-to-vps.sh root@<this-server>"
-  STAGE=$DATA/rg-import
-  rm -rf "$STAGE"
-  cp -a "$TRANSFER" "$STAGE"
-  mv "$STAGE/prod-ca-2021.crt" "$DATA/prod-ca-2021.crt"
-  chown -R "$USER_NAME:$USER_NAME" "$DATA"
-  chmod 700 "$STAGE"; chmod 644 "$DATA/prod-ca-2021.crt"
-  # The copied database settings point at the certificate's path on the Mac.
-  as_user python3 - "$STAGE/.supabase-runtime.json" "$DATA/prod-ca-2021.crt" <<'EOF'
-import json, sys, pathlib
-p = pathlib.Path(sys.argv[1]); s = json.loads(p.read_text()); s['sslrootcert'] = sys.argv[2]
-p.write_text(json.dumps(s, indent=2) + '\n')
-EOF
-  as_user "$BIN/hustleai-tenant" import-legacy "$SLUG" --from "$STAGE" \
-    --name "RG Midrand" --owner-name Roland --owner-number +27837758811
-  rm -rf "$STAGE" "$TRANSFER"
-  as_user env HUSTLEAI_DATA_DIR="$TENANT_DIR" "$BIN/hustleai-forecast" start-date today
-  ok "Imported. The copies in $TRANSFER were removed."
-fi
+echo "Answer the questions below. Secrets are typed at hidden prompts."
+as_user "$BIN/hustleai-tenant" bootstrap "$SLUG" </dev/tty
 as_user env HUSTLEAI_DATA_DIR="$TENANT_DIR" "$BIN/hustleai-orders" status || warn "Orders not synced yet; the nightly job will do it."
 
 step "5/7 Hermes Agent"

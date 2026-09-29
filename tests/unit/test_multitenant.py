@@ -218,3 +218,76 @@ class TenantCommandTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class BootstrapTests(unittest.TestCase):
+    """The installer's questions, with Supabase and Zoho replaced by fakes."""
+
+    URI = 'postgresql://postgres.abcdef:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres'
+
+    def setUp(self):
+        from unittest.mock import MagicMock
+        self.temp = tempfile.TemporaryDirectory()
+        base = Path(self.temp.name)
+        self.root = base / 'tenants'
+        self.admin_dir = base / 'admin'
+        self.cert = base / 'ca.crt'
+        self.cert.write_text('CERT')
+        self.provisioned = []
+
+        def provision(admin, fields, folder, slug, organization, reassign=False):
+            self.provisioned.append((dict(fields), slug, organization, reassign))
+            Path(folder, '.supabase-runtime.json').write_text('{}')
+            return 'hustleai_rt_' + slug.replace('-', '_')
+        self.patches = [patch('hustleai.config.TENANTS_ROOT', self.root), patch.object(tenant_cli, 'TENANTS_ROOT', self.root),
+                        patch('hustleai.storage.postgres.repository.connect', return_value=MagicMock()),
+                        patch('hustleai.storage.postgres.upgrade.apply_upgrades', return_value=[]),
+                        patch('hustleai.storage.postgres.migrate.organization_login', return_value='hustleai_runtime'),
+                        patch('hustleai.storage.postgres.migrate.provision_tenant', side_effect=provision),
+                        patch.object(tenant_cli, 'zoho_exchange', return_value={'refresh_token': 'r-1', 'api_domain': 'https://www.zohoapis.com'}),
+                        patch('hustleai.integrations.zoho.client.Client')]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.temp.cleanup()
+
+    def run_bootstrap(self, answers, secrets):
+        args = type('Args', (), {'slug': 'rg-midrand'})()
+        with patch('builtins.input', side_effect=answers), patch('getpass.getpass', side_effect=secrets), \
+             patch('builtins.print'):
+            tenant_cli.bootstrap_command(args, ca_cert=self.cert, admin_dir=self.admin_dir)
+
+    def test_first_run_asks_for_everything(self):
+        # Business: defaults except the Zoho org; not VAT-registered. Database: move the
+        # organization from the old login, don't keep the admin login. Zoho: default region.
+        self.run_bootstrap(['', '', '', '782228241', '', '', '', 'n', 'y', 'n', ''],
+                           [self.URI, 'db-pass', 'client-id', 'client-secret', 'code-123'])
+        folder = self.root / 'rg-midrand'
+        settings = json.loads((folder / 'tenant.json').read_text())
+        self.assertEqual((settings['name'], settings['owner_name'], settings['organization_id'], settings['vat_registered']),
+                         ('RG Midrand', 'Roland', '782228241', False))
+        self.assertTrue(settings['forecast_start_date'])
+        fields, slug, organization, reassign = self.provisioned[0]
+        self.assertEqual((slug, organization, reassign), ('rg-midrand', '782228241', True))
+        self.assertEqual((fields['password'], fields['sslrootcert'], fields['port']), ('db-pass', str(self.cert), 5432))
+        self.assertFalse((self.admin_dir / '.supabase-credentials.json').exists())  # removed as asked
+        zoho = json.loads((folder / '.zoho-credentials.json').read_text())
+        self.assertEqual((zoho['refresh_token'], zoho['accounts_url']), ('r-1', 'https://accounts.zoho.com'))
+        self.assertEqual(stat.S_IMODE((folder / '.zoho-credentials.json').stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(folder.stat().st_mode), 0o700)
+
+    def test_refusing_to_move_the_organization_stops(self):
+        with self.assertRaisesRegex(ValueError, 'stays with the old login'):
+            self.run_bootstrap(['', '', '', '782228241', '', '', '', 'n', 'n'], [self.URI, 'db-pass'])
+        self.assertEqual(self.provisioned, [])
+
+    def test_rerun_keeps_everything(self):
+        self.run_bootstrap(['', '', '', '782228241', '', '', '', 'n', 'y', 'y', ''],
+                           [self.URI, 'db-pass', 'client-id', 'client-secret', 'code-123'])
+        self.provisioned.clear()
+        self.run_bootstrap(['n', 'n', 'n'], [])
+        self.assertEqual(self.provisioned, [])
+        self.assertTrue((self.admin_dir / '.supabase-credentials.json').exists())  # kept as asked

@@ -171,7 +171,13 @@ def tenant_role_name(slug):
     return 'hustleai_rt_' + slug.replace('-', '_')
 
 
-def provision_tenant(admin, admin_settings, tenant_root, slug, organization, schema=SCHEMA):
+def organization_login(admin, organization, schema=SCHEMA):
+    """Return the login role currently mapped to an organization, or None."""
+    row = admin.execute(f'SELECT role_name FROM {schema}.tenant_roles WHERE organization_id=%s', (str(organization),)).fetchone()
+    return row[0] if row else None
+
+
+def provision_tenant(admin, admin_settings, tenant_root, slug, organization, schema=SCHEMA, reassign=False):
     """Create or reuse a tenant's restricted login and write its private settings.
 
     The login inherits hustleai_tenant (all grants live there) and is mapped
@@ -179,6 +185,10 @@ def provision_tenant(admin, admin_settings, tenant_root, slug, organization, sch
     checks. The password is saved to tenant_root/.supabase-runtime.json
     before the role is created, so an interrupted run can resume. Requires
     migration 202609290006. Returns the login role name.
+
+    reassign=True moves an organization already mapped to another login (for
+    example the old single-server login) to this tenant's login; the old
+    login then sees no rows. Callers must confirm this with the owner first.
     """
     from psycopg import sql
     role = tenant_role_name(slug)
@@ -199,7 +209,9 @@ def provision_tenant(admin, admin_settings, tenant_root, slug, organization, sch
             raise ValueError('This tenant login is already mapped to a different organization.')
         taken = admin.execute(f'SELECT role_name FROM {schema}.tenant_roles WHERE organization_id=%s', (str(organization),)).fetchone()
         if taken and taken[0] != role:
-            raise ValueError('That organization already belongs to another tenant login.')
+            if not reassign:
+                raise ValueError('That organization already belongs to another tenant login.')
+            admin.execute(f'DELETE FROM {schema}.tenant_roles WHERE role_name=%s', (taken[0],))
         if not exists:
             admin.execute(sql.SQL('CREATE ROLE {} LOGIN PASSWORD {} INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS').format(
                 sql.Identifier(role), sql.Literal(runtime['password'])))

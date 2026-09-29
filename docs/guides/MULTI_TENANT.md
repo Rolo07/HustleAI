@@ -70,7 +70,7 @@ never in a tenant folder. In the tenant's Meta app, set the webhook to
 
 ## Moving RG Midrand to tenant 1
 
-On a new VPS, the [quick install](../../deploy/README.md#quick-install) does all of this for you.
+On a new VPS, the [quick install](../../deploy/README.md#quick-install) does all of this without the Mac: `hustleai-tenant bootstrap rg-midrand` asks for the Zoho, Supabase and business details on the server and moves the organization to the server's own database login.
 
 The current single-business install already is RG Midrand. The move copies
 files and doesn't touch the database, because the organization ID stays the same.
