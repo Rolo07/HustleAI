@@ -47,9 +47,10 @@ def main():
         private_write(CONFIG, json.dumps(config, indent=2))
         print('Local settings saved. Next: python3 zoho_clients.py sync')
         return
-    if not CONFIG.exists():
+    from hustleai.tenant import read_settings
+    config = read_settings(ROOT, CONFIG)  # tenant folders keep settings in tenant.json
+    if not config.get('organization_id'):
         raise ValueError('Configure your organization first: python3 zoho_clients.py configure --organization-id YOUR_ID --country-code 27')
-    config = json.loads(CONFIG.read_text())
     store = open_repository(config, ROOT)
     try:
         client = Client(config['organization_id'])

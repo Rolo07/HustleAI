@@ -269,6 +269,14 @@ def hermes_install(slug, hermes='hermes', hermes_root=None, tenants_root=None, d
         if job not in installed['cron']:
             run([hermes, '-p', slug, 'cron', 'create', schedule, '--no-agent', '--script', script, '--deliver', 'local'])
             installed['cron'].append(job)
+    # Hermes discovers directory plugins in ~/.hermes/plugins; HustleAI lives
+    # in its own virtual environment, so link the plugin folder there.
+    link = hermes_root / 'plugins' / 'hustleai'
+    if not link.exists():
+        log(f'link {link} -> {HERMES_PACKAGE}')
+        if not dry_run:
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(HERMES_PACKAGE, target_is_directory=True)
     run([hermes, 'plugins', 'enable', 'hustleai'])
     run([hermes, 'config', 'set', 'gateway.multiplex_profiles', 'true'])
     if not dry_run:

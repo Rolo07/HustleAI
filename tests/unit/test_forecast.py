@@ -248,6 +248,14 @@ class ForecastTests(unittest.TestCase):
             self.assertNotIn('forecast_start_date', json.loads(config.read_text()))
             with self.assertRaises(ValueError):
                 cli.start_date('15/10/2026')
+            # A tenant folder keeps settings in tenant.json and has no .zoho-local.json.
+            config.unlink()
+            (self.root / 'tenant.json').write_text(json.dumps({'owner_name': 'Roland'}))
+            cli.start_date('2026-10-20')
+            self.assertEqual(json.loads((self.root / 'tenant.json').read_text()),
+                             {'owner_name': 'Roland', 'forecast_start_date': '2026-10-20'})
+            self.assertFalse(config.exists())
+            self.assertIn('2026-10-20', cli.start_date(None))
 
     def test_cycle_settings(self):
         with self.assertRaises(ValueError):

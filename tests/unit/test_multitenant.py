@@ -203,6 +203,8 @@ class TenantCommandTests(unittest.TestCase):
         agent = json.loads((folder / '.whatsapp.json').read_text())['owner_agent']
         self.assertEqual((agent['url'], agent['api_key']),
                          ('http://127.0.0.1:8642/p/rg-midrand/v1/chat/completions', env['API_SERVER_KEY']))
+        plugin = hermes_root / 'plugins' / 'hustleai'
+        self.assertTrue(plugin.is_symlink() and (plugin / 'plugin.yaml').is_file())
         script = profile / 'scripts' / 'hustleai-orders-sync.sh'
         self.assertEqual(stat.S_IMODE(script.stat().st_mode), 0o700)
         self.assertIn('run-job rg-midrand orders-sync', script.read_text())

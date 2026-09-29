@@ -37,19 +37,25 @@ def write_report(report, root=ROOT):
 def start_date(value, clear=False):
     """Show, set or clear forecast_start_date in the private local settings.
 
-    Needs no Zoho or database access. value is YYYY-MM-DD or 'today' in
-    South Africa. Other settings in the file are preserved.
+    Needs no Zoho or database access. value is YYYY-MM-DD or 'today' in the
+    tenant's timezone. Writes tenant.json when the folder has one (tenant
+    folders have no .zoho-local.json), otherwise .zoho-local.json. Other
+    settings in the file are preserved.
     """
-    config = json.loads(CONFIG.read_text())
+    from hustleai.tenant import TENANT_FILE, Tenant, read_settings
+    tenant_file = CONFIG.parent / TENANT_FILE
+    target = tenant_file if tenant_file.exists() else CONFIG
+    config = json.loads(target.read_text()) if target.exists() else {}
+    zone = Tenant.from_settings(read_settings(CONFIG.parent, CONFIG)).zone
     if clear:
         config.pop('forecast_start_date', None)
     elif value:
-        chosen = local_today() if value == 'today' else date.fromisoformat(value)
+        chosen = local_today(zone=zone) if value == 'today' else date.fromisoformat(value)
         config['forecast_start_date'] = chosen.isoformat()
     else:
-        current = tracking_start(config)
+        current = tracking_start(read_settings(CONFIG.parent, CONFIG))
         return f'Tracking orders since {current}.' if current else 'No start date set; all order history is counted.'
-    private_write(CONFIG, json.dumps(config, indent=2) + '\n')
+    private_write(target, json.dumps(config, indent=2) + '\n')
     if clear:
         return 'Start date cleared; all order history is counted.'
     return f"Tracking orders since {config['forecast_start_date']}. Older invoices are ignored."
