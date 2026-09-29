@@ -111,13 +111,15 @@ class PdfFolderTests(unittest.TestCase):
             created = {}
             class StubAPI:
                 organization = '782228241'
-                def __init__(self, organization, pdf_dir=None):
+                def __init__(self, organization, pdf_dir=None, root=None):
                     created['pdf_dir'] = pdf_dir
+                    created['root'] = root
             with patch('hustleai.workflows.service.CONFIG', config), \
                  patch('hustleai.workflows.service.API', StubAPI):
                 service = Service(root=root)
                 service.close()
             self.assertEqual(created['pdf_dir'], root / 'invoice-pdfs')
+            self.assertEqual(created['root'], root)  # credentials come from the tenant's folder
             self.assertEqual(service.pdf_dir, root / 'invoice-pdfs')
 
     def test_download_writes_into_the_given_folder(self):

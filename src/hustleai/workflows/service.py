@@ -44,7 +44,10 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
             client information and must be protected like the credentials.
         """
         self.root = Path(root)
-        config = read_settings(self.root, CONFIG)
+        # The legacy settings file belongs to the default folder; another
+        # tenant's folder must never inherit it.
+        legacy = CONFIG if Path(CONFIG).parent.resolve() == self.root.resolve() else self.root / CONFIG.name
+        config = read_settings(self.root, legacy)
         if not config.get('organization_id'):
             raise ValueError('No tenant settings found. Create tenant.json or run hustleai-tenant create.')
         self.workflow_config = config
@@ -55,7 +58,7 @@ class Service(ClientWorkflows, InvoiceCreation, PaymentWorkflows, InvoiceWorkflo
         self.store = open_repository(config, self.root)
         self.db = self.store.connection  # Compatibility for existing local tests.
         try:
-            self.api = api or API(config['organization_id'], self.pdf_dir)
+            self.api = api or API(config['organization_id'], self.pdf_dir, self.root)
             if str(self.api.organization) != str(config['organization_id']):
                 raise ValueError('API and storage organizations must match.')
         except BaseException:

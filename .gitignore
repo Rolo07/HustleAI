@@ -36,3 +36,6 @@ reports/
 
 # WhatsApp Cloud API settings and secrets
 .whatsapp.json
+
+# Tenant business settings (owner name and number) on this machine
+tenant.json

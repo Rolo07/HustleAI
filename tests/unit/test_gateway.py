@@ -251,7 +251,7 @@ class GatewayTests(unittest.TestCase):
         self.s.store.claim_webhook_event(event['id'], 'message', event)
         gateway = Gateway(SETTINGS, lambda: self.s.store.__class__(self.root, '782228241'), lambda s, e: None)
         gateway.recover()
-        self.assertEqual(gateway.events.get_nowait()['id'], 'wamid.r')
+        self.assertEqual(gateway.events.get_nowait()[1]['id'], 'wamid.r')
 
 
 class McpGateTests(unittest.TestCase):

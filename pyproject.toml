@@ -11,6 +11,7 @@ dependencies = ["mcp>=1.12,<2", "certifi"]
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2,<4"]
+hermes = ["pyyaml>=6,<7"]
 
 [project.scripts]
 hustleai-mcp = "hustleai.mcp.owner_server:main"
@@ -18,8 +19,16 @@ hustleai-contacts = "hustleai.cli.contacts:run"
 hustleai-forecast = "hustleai.cli.forecast:run"
 hustleai-orders = "hustleai.cli.orders:run"
 hustleai-whatsapp = "hustleai.cli.whatsapp:run"
+hustleai-tenant = "hustleai.cli.tenant:run"
+
 hustleai-zoho-setup = "hustleai.cli.setup:run"
 hustleai-zoho-upgrade = "hustleai.cli.upgrade:run"
 
+[project.entry-points."hermes_agent.plugins"]
+hustleai = "hustleai.hermes:register"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"hustleai.hermes" = ["plugin.yaml", "skills/*/SKILL.md", "profile/*.tmpl", "scripts/*.tmpl"]

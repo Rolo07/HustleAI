@@ -18,61 +18,98 @@ from hustleai.integrations.whatsapp.webhook import parse_events, signature_valid
 MAX_BODY = 1024 * 1024
 
 
-class Gateway:
-    """Owns the event queue. store_factory opens a storage session;
-    process(store, event) handles one event with that session."""
+DEFAULT = ''  # Route key for single-tenant installs served at /webhook.
+
+
+class Route:
+    """One tenant's webhook route: its settings, storage and event handler."""
 
     def __init__(self, settings, store_factory, process):
         self.settings = settings
         self.store_factory = store_factory
         self.process = process
+
+
+class Gateway:
+    """Owns the event queue for one or many tenants.
+
+    Single tenant: Gateway(settings, store_factory, process), served at
+    /webhook. Many tenants: Gateway(routes={slug: Route(...)}), each served
+    at /webhook/<slug>, verified with that tenant's own app secret and
+    phone number ID. Queue items are (slug, event).
+    """
+
+    def __init__(self, settings=None, store_factory=None, process=None, routes=None):
+        self.routes = dict(routes or {})
+        if settings is not None:
+            self.routes[DEFAULT] = Route(settings, store_factory, process)
         self.events = queue.Queue()
         self.errors = []
 
-    def accept(self, body, signature):
-        """Verify, parse and durably store a webhook body.
+    @property
+    def settings(self):
+        """Settings of the single-tenant route (compatibility)."""
+        return self.routes[DEFAULT].settings
 
-        Returns the HTTP status: 403 for a bad signature, 400 for bad JSON,
-        otherwise 200 after new events are stored and queued.
+    def route(self, slug):
+        """Return the Route for a slug, or None if unknown."""
+        return self.routes.get(slug if slug is not None else DEFAULT)
+
+    def challenge(self, slug, params):
+        """Answer Meta's subscription check for one tenant, or None."""
+        route = self.route(slug)
+        return subscription_challenge(params, route.settings['verify_token']) if route else None
+
+    def accept(self, body, signature, slug=None):
+        """Verify, parse and durably store a webhook body for one tenant.
+
+        Returns the HTTP status: 404 for an unknown tenant, 403 for a bad
+        signature, 400 for bad JSON, otherwise 200 after new events are
+        stored and queued. Events for another phone number ID are ignored.
         """
-        if not signature_valid(self.settings['app_secret'], body, signature):
+        route = self.route(slug)
+        if route is None:
+            return 404
+        if not signature_valid(route.settings['app_secret'], body, signature):
             return 403
         try:
             payload = json.loads(body)
         except ValueError:
             return 400
-        events = parse_events(payload, self.settings['phone_number_id'])
+        events = parse_events(payload, route.settings['phone_number_id'])
         if events:
-            store = self.store_factory()
+            store = route.store_factory()
             try:
                 for event in events:
                     if store.claim_webhook_event(event['id'], event['kind'], event):
-                        self.events.put(event)
+                        self.events.put((slug if slug is not None else DEFAULT, event))
             finally:
                 store.close()
         return 200
 
     def recover(self):
-        """Queue stored events that were never processed (after a crash)."""
-        store = self.store_factory()
-        try:
-            for event in store.unprocessed_webhook_events():
-                self.events.put(event)
-        finally:
-            store.close()
+        """Queue every tenant's stored events that were never processed."""
+        for slug, route in self.routes.items():
+            store = route.store_factory()
+            try:
+                for event in store.unprocessed_webhook_events():
+                    self.events.put((slug, event))
+            finally:
+                store.close()
 
     def work_once(self, timeout=None):
         """Process one queued event; errors are kept and never stop the worker."""
-        event = self.events.get(timeout=timeout)
+        slug, event = self.events.get(timeout=timeout)
         try:
-            store = self.store_factory()
+            route = self.routes[slug]
+            store = route.store_factory()
             try:
-                self.process(store, event)
+                route.process(store, event)
             finally:
                 store.close()
         except Exception as error:  # Keep serving; the event stays unprocessed for recovery.
-            self.errors.append((event.get('id'), type(error).__name__))
-            print(f"Event {event.get('id')} failed: {type(error).__name__}", flush=True)
+            self.errors.append((slug, event.get('id'), type(error).__name__))
+            print(f"Tenant {slug or 'default'} event {event.get('id')} failed: {type(error).__name__}", flush=True)
         finally:
             self.events.task_done()
 
@@ -80,6 +117,16 @@ class Gateway:
         """Process events forever on a daemon thread."""
         while True:
             self.work_once()
+
+
+def webhook_slug(path):
+    """Return the tenant slug for /webhook/<slug>, DEFAULT for /webhook, else None."""
+    if path == '/webhook':
+        return DEFAULT
+    if path.startswith('/webhook/'):
+        slug = path[len('/webhook/'):]
+        return slug if slug and '/' not in slug else None
+    return None
 
 
 def handler_for(gateway):
@@ -99,21 +146,22 @@ def handler_for(gateway):
             url = urllib.parse.urlsplit(self.path)
             if url.path == '/health':
                 return self.respond(200, b'ok')
-            if url.path == '/webhook':
-                params = dict(urllib.parse.parse_qsl(url.query))
-                challenge = subscription_challenge(params, gateway.settings['verify_token'])
-                return self.respond(200, challenge.encode()) if challenge else self.respond(403)
-            self.respond(404)
+            slug = webhook_slug(url.path)
+            if slug is None:
+                return self.respond(404)
+            challenge = gateway.challenge(slug, dict(urllib.parse.parse_qsl(url.query)))
+            return self.respond(200, challenge.encode()) if challenge else self.respond(403)
 
         def do_POST(self):
-            if urllib.parse.urlsplit(self.path).path != '/webhook':
+            slug = webhook_slug(urllib.parse.urlsplit(self.path).path)
+            if slug is None:
                 return self.respond(404)
             length = int(self.headers.get('Content-Length') or 0)
             if length <= 0 or length > MAX_BODY:
                 return self.respond(413 if length > MAX_BODY else 400)
             body = self.rfile.read(length)
             try:
-                status = gateway.accept(body, self.headers.get('X-Hub-Signature-256'))
+                status = gateway.accept(body, self.headers.get('X-Hub-Signature-256'), slug)
             except Exception as error:
                 # Storage failed: ask Meta to retry later rather than lose the event.
                 print(f'Webhook storage failed: {type(error).__name__}', flush=True)

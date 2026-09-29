@@ -1,0 +1,6 @@
+name: hustleai
+version: 0.1.0
+description: HustleAI owner assistant skill for Zoho invoicing, reorder forecasts and WhatsApp.
+author: HustleAI
+provides_tools: []
+provides_hooks: []

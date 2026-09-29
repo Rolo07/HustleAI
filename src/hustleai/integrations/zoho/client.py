@@ -15,7 +15,7 @@ from hustleai.integrations.zoho.auth import tls_context
 from hustleai.domain.validation import identifier
 
 class Client:
-    def __init__(self, organization):
+    def __init__(self, organization, root=None):
         """Load local credentials and obtain an access token for this instance.
 
         Args:
@@ -34,7 +34,8 @@ class Client:
         self.context = tls_context()
         self.calls = 0
         self.rate_remaining = None  # Zoho's daily requests left, from response headers.
-        credentials = json.loads((ROOT / '.zoho-credentials.json').read_text())
+        # Each tenant keeps its own Zoho credentials in its private folder.
+        credentials = json.loads((Path(root or ROOT) / '.zoho-credentials.json').read_text())
         data = urllib.parse.urlencode({
             key: credentials[key] for key in ('client_id', 'client_secret', 'refresh_token')
         } | {'grant_type': 'refresh_token'}).encode()
@@ -104,7 +105,7 @@ class Client:
                      'X-com-zoho-invoice-organizationid': self.organization}))
 
 class API(Client):
-    def __init__(self, organization, pdf_dir=None):
+    def __init__(self, organization, pdf_dir=None, root=None):
         """Authenticate and choose the one private folder for downloaded PDFs.
 
         Args:
@@ -113,8 +114,8 @@ class API(Client):
                 downloads and review copies always share one location. Defaults
                 to invoice-pdfs under the configured data directory.
         """
-        super().__init__(organization)
-        self.pdf_dir = Path(pdf_dir) if pdf_dir else ROOT / 'invoice-pdfs'
+        super().__init__(organization, root)
+        self.pdf_dir = Path(pdf_dir) if pdf_dir else Path(root or ROOT) / 'invoice-pdfs'
 
     def post(self, path, payload):
         """Submit one JSON mutation to the configured Zoho organization.

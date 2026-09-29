@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# HustleAI scheduled job for tenant {slug}: {job}.
+# Installed by hustleai-tenant hermes-install; runs as a Hermes script-only
+# cron job. Silent on success; prints an error and exits non-zero on failure,
+# which Hermes reports.
+set -euo pipefail
+export HUSTLEAI_TENANTS_ROOT={tenants_root}
+exec {tenant_command} run-job {slug} {job}
