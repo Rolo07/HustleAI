@@ -5,6 +5,12 @@ The application package exposes `hustleai.workflows.service.Service` and the
 public API port is needed. Defaults: ZAR, final prices with no VAT (not VAT-registered), seven-day terms,
 unsent draft invoices. No customer email or WhatsApp sending endpoint is exposed.
 
+> **Multi-tenant installs:** use `hustleai-tenant hermes-install <slug>`
+> instead of the manual steps below. It creates the profile, MCP server,
+> skill, API key and cron jobs. See the [multi-tenant guide](MULTI_TENANT.md).
+> The operating rules below now ship as the `hustleai-owner` skill in the
+> `hustleai` Hermes plugin, so they don't need pasting in.
+
 ## Upgrade OAuth first
 
 Run `python3 zoho_upgrade.py`. In the same Zoho Self Client that created the

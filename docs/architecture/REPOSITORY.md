@@ -6,7 +6,10 @@ still pending. See the [migration and recovery guide](../../supabase/README.md).
 
 ```text
 src/hustleai/
-  config.py                      Central private-data paths
+  config.py                      Central private-data paths, tenants root
+  tenant.py                      Tenant settings (tenant.json) and features
+  tenants.py                     Registry of private tenant folders
+  hermes/                        Hermes plugin: skill, profile and job templates
   domain/
     phones.py                    Number normalization
     validation.py                IDs and decimal validation
@@ -50,6 +53,7 @@ src/hustleai/
     forecast.py                  Weekly forecast and cycle command
     orders.py                    Orders sync and status command
     whatsapp.py                  Gateway setup, check, test and serve
+    tenant.py                    Tenant create, import, jobs and Hermes install
 supabase/
   migrations/                    Applied initial PostgreSQL schema
   README.md                      Migration and cutover checklist

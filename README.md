@@ -53,6 +53,15 @@ The owner MCP exposes 18 tools, including a weekly
 [reorder forecast](docs/guides/REORDER_FORECAST.md) for stock and delivery planning. Customer gateway authorization and WhatsApp
 sending are not implemented yet. See [workflow tools](docs/guides/ZOHO_WORKFLOW_TOOLS.md).
 
+## Tenants and Hermes
+
+One install can serve several businesses. **RG Midrand is tenant 1.** Each
+tenant has its own private folder with `tenant.json` (owner, currency,
+timezone, terms, VAT, features) and secrets, its own database login, which is
+enforced by row-level security, its own WhatsApp route and its own Hermes profile.
+`hustleai-tenant create`, `import-legacy` and `hermes-install` set these up.
+See the [multi-tenant guide](docs/guides/MULTI_TENANT.md).
+
 ## WhatsApp gateway
 
 The gateway receives messages to the business WhatsApp number (Meta Cloud API).

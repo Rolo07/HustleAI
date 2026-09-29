@@ -75,7 +75,9 @@ delivery) are not built yet. Until they are, every customer message is a referra
    [`hustleai-gateway.service`](../../deploy/schedule/hustleai-gateway.service)
    and start it.
 5. **Webhook.** In the Meta app, set the callback URL to
-   `https://<your domain>/webhook`, enter the verify token and subscribe to the
+   `https://<your domain>/webhook/<slug>` on a multi-tenant install (for
+   example `/webhook/rg-midrand`), or `https://<your domain>/webhook` for a
+   single business. Enter the verify token and subscribe to the
    **messages** field.
 6. **Template, for messages outside the 24-hour window.** Create a Utility template,
    for example `hustleai_notice` in English, with text like "You have a new HustleAI update.
@@ -93,6 +95,15 @@ delivery) are not built yet. Until they are, every customer message is a referra
 
 The business number is only a setting. To change it later, rerun `setup` with
 the new number and phone number ID.
+
+## Several businesses
+
+With tenants (see the [multi-tenant guide](MULTI_TENANT.md)), add
+`--tenant <slug>` to `setup`, `check` and `send-test`, and run
+`hustleai-whatsapp serve --all-tenants`. Every tenant with WhatsApp enabled
+gets its own route, `/webhook/<slug>`, checked with its own app secret and
+phone number ID. Owner free text goes to that tenant's Hermes profile.
+`hustleai-tenant hermes-install` sets the address and key.
 
 ## Settings file
 

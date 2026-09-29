@@ -1,8 +1,14 @@
-# Merge into ~/.hermes/config.yaml after installing this project on the VPS.
-# Replace paths. This toolset is OWNER ONLY; do not expose it to customer agents.
+# Single-business example. On a multi-tenant install, run
+#   hustleai-tenant hermes-install <slug>
+# instead: it writes this block into ~/.hermes/profiles/<slug>/config.yaml with
+# HUSTLEAI_DATA_DIR set to that tenant's folder, and disables the terminal,
+# file and code-execution toolsets. This toolset is OWNER ONLY; never expose it
+# to customer agents.
 mcp_servers:
-  zoho_invoice:
+  hustleai:
     command: /opt/hustleai/.venv/bin/python
     args: ["-m", "hustleai.mcp.owner_server"]
     env:
       HUSTLEAI_DATA_DIR: /var/lib/hustleai
+agent:
+  disabled_toolsets: [terminal, file, code_execution, browser, delegation]
