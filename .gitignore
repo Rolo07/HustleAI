@@ -39,3 +39,6 @@ reports/
 
 # Tenant business settings (owner name and number) on this machine
 tenant.json
+
+# macOS Finder metadata
+.DS_Store

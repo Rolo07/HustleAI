@@ -10,6 +10,7 @@ reach it: the gateway runs those itself. Configure under owner_agent in
 import json
 import urllib.error
 import urllib.request
+from hustleai.integrations.zoho.auth import tls_context
 
 
 class OwnerAgent:
@@ -19,6 +20,7 @@ class OwnerAgent:
         self.url = settings['url']
         self.model = settings.get('model') or 'default'
         self.api_key = settings.get('api_key')
+        self.user = settings.get('user') or 'owner'
         # Hermes keeps one conversation per key across messages.
         self.session_key = settings.get('session_key') or session_key
 
@@ -29,10 +31,10 @@ class OwnerAgent:
             headers['Authorization'] = 'Bearer ' + self.api_key
         if self.session_key:
             headers['X-Hermes-Session-Key'] = self.session_key[:256]
-        body = json.dumps({'model': self.model, 'user': 'owner',
+        body = json.dumps({'model': self.model, 'user': self.user,
                            'messages': [{'role': 'user', 'content': text}]}).encode()
         try:
-            with urllib.request.urlopen(urllib.request.Request(self.url, body, headers), timeout=180) as response:
+            with urllib.request.urlopen(urllib.request.Request(self.url, body, headers), timeout=180, context=tls_context()) as response:
                 reply = json.load(response)['choices'][0]['message']['content']
         except (urllib.error.URLError, TimeoutError, KeyError, IndexError, ValueError):
             raise ValueError('The assistant is unavailable right now. Commands still work: send HELP.') from None

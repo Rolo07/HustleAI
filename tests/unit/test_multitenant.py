@@ -98,7 +98,8 @@ class OwnerAgentTests(unittest.TestCase):
             def __enter__(self): return self
             def __exit__(self, *a): return False
             def read(self, *a): return json.dumps({'choices': [{'message': {'content': 'Hi'}}]}).encode()
-        def urlopen(request, timeout=None):
+        def urlopen(request, timeout=None, context=None):
+            self.assertIsNotNone(context)
             seen.update(dict(request.header_items()), url=request.full_url)
             return Response()
         agent = OwnerAgent({'url': 'http://127.0.0.1:8642/p/rg-midrand/v1/chat/completions', 'api_key': 'sk-x'},

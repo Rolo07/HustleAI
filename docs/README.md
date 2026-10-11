@@ -1,5 +1,7 @@
 # Documentation
 
+- [Owner dashboard](guides/OWNER_DASHBOARD.md): local preview, owner authentication, reorder versions, takeover and live integration setup.
+
 - [Repository structure](architecture/REPOSITORY.md): where code belongs and what is active versus planned.
 - [Code walkthrough](architecture/CODE_WALKTHROUGH.md): first-time introduction with diagrams.
 - [Visual flow guide](flow-guide.html): nine rendered flows, browser navigation and zoom.

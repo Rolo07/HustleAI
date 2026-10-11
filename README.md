@@ -1,7 +1,7 @@
 # HustleAI
 
-Zoho Invoice workflows and owner-side Hermes MCP tools, with a separate home for
-future WhatsApp customer automation and active hosted Supabase storage.
+Zoho Invoice workflows, owner-side Hermes MCP tools, and the RG Midrand owner
+dashboard with Meta WhatsApp integration and hosted Supabase storage.
 
 ## Start here
 
@@ -14,7 +14,8 @@ future WhatsApp customer automation and active hosted Supabase storage.
 
 ```text
 src/hustleai/       Application package
-  integrations/    Zoho transport; planned WhatsApp gateway boundary
+  integrations/    Zoho transport, Meta WhatsApp gateway and Hermes adapter
+  dashboard/       Authenticated owner workspace and persistent approval state
   workflows/       Clients, invoices, payments, reorders and approvals
   mcp/             Owner-side Hermes tools
   storage/         PostgreSQL repositories, private files and legacy test adapters
@@ -50,8 +51,8 @@ python3 zoho_clients.py sync
 ```
 
 The owner MCP exposes 18 tools, including a weekly
-[reorder forecast](docs/guides/REORDER_FORECAST.md) for stock and delivery planning. Customer gateway authorization and WhatsApp
-sending are not implemented yet. See [workflow tools](docs/guides/ZOHO_WORKFLOW_TOOLS.md).
+[reorder forecast](docs/guides/REORDER_FORECAST.md) for stock and delivery planning. The signed WhatsApp gateway and owner dashboard enforce customer/owner
+authorization and approval before sending. See [workflow tools](docs/guides/ZOHO_WORKFLOW_TOOLS.md).
 
 ## Tenants and Hermes
 
@@ -62,7 +63,43 @@ enforced by row-level security, its own WhatsApp route and its own Hermes profil
 `hustleai-tenant create`, `import-legacy` and `hermes-install` set these up.
 See the [multi-tenant guide](docs/guides/MULTI_TENANT.md).
 
+## Owner dashboard
+
+Run `.venv/bin/python -m hustleai.dashboard.server --demo` and open
+http://127.0.0.1:8090 for the explicitly fictional local preview. The same
+backend supports authenticated live test-account mode, tenant PostgreSQL,
+Zoho draft reviews and a restricted Hermes profile. See the
+[owner dashboard guide](docs/guides/OWNER_DASHBOARD.md) for setup and blockers.
+
+The workspace includes a searchable inbox, conversation history and internal
+notes, an approval queue, current order details, takeover/resume controls,
+manual replies and an activity log. Customer confirmation and owner approval
+bind to the exact order version; API acceptance is shown separately from delivery.
+
+### Dashboard screenshots
+
+These screenshots use **fictional demo customers and products**. They contain no
+live customer data or credentials.
+
+**Desktop inbox and order review**
+
+![RG Midrand desktop dashboard with inbox, conversation and reviewed order](docs/screenshots/dashboard-desktop.jpg)
+
+**Mobile orders**
+
+<img src="docs/screenshots/dashboard-mobile.jpg" alt="RG Midrand mobile dashboard with fictional order cards and approval states" width="390">
+
+See the [browser and live-check report](docs/guides/DASHBOARD_QA.md) and
+[customer Hermes VPS setup](docs/guides/HERMES_CUSTOMER_VPS.md). Live end-to-end
+reorders still require the restricted Hermes connection, authoritative stock
+availability and Meta inbound webhook access.
+
+
 ## WhatsApp gateway
+
+For isolated Meta test-account echo testing, see the
+[test backend setup](docs/guides/WHATSAPP_TEST_ACCOUNT.md). It uses environment
+credentials and never touches production workflows or the real business number.
 
 The gateway receives messages to the business WhatsApp number (Meta Cloud API).
 Only Roland's number, verified from Meta's signed webhook, can run `CONFIRM`,

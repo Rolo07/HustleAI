@@ -20,6 +20,7 @@ hustleai-forecast = "hustleai.cli.forecast:run"
 hustleai-orders = "hustleai.cli.orders:run"
 hustleai-whatsapp = "hustleai.cli.whatsapp:run"
 hustleai-tenant = "hustleai.cli.tenant:run"
+hustleai-dashboard = "hustleai.dashboard.server:main"
 
 hustleai-zoho-setup = "hustleai.cli.setup:run"
 hustleai-zoho-upgrade = "hustleai.cli.upgrade:run"
@@ -32,3 +33,4 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "hustleai.hermes" = ["plugin.yaml", "skills/*/SKILL.md", "profile/*.tmpl", "scripts/*.tmpl"]
+"hustleai.dashboard" = ["static/*.html", "static/*.css", "static/*.js"]

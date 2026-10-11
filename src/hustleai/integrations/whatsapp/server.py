@@ -76,7 +76,10 @@ class Gateway:
             payload = json.loads(body)
         except ValueError:
             return 400
-        events = parse_events(payload, route.settings['phone_number_id'])
+        try:
+            events = parse_events(payload, route.settings['phone_number_id'])
+        except (AttributeError, TypeError):
+            return 400
         if events:
             store = route.store_factory()
             try:
@@ -156,7 +159,10 @@ def handler_for(gateway):
             slug = webhook_slug(urllib.parse.urlsplit(self.path).path)
             if slug is None:
                 return self.respond(404)
-            length = int(self.headers.get('Content-Length') or 0)
+            try:
+                length = int(self.headers.get('Content-Length') or 0)
+            except ValueError:
+                return self.respond(400)
             if length <= 0 or length > MAX_BODY:
                 return self.respond(413 if length > MAX_BODY else 400)
             body = self.rfile.read(length)

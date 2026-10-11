@@ -1,16 +1,17 @@
 """Meta webhook verification and event parsing. No business rules here."""
 import hashlib
 import hmac
+import re
 
 from hustleai.domain.phones import normalize
 
 
 def signature_valid(app_secret, body, header):
     """Check X-Hub-Signature-256 (HMAC-SHA256 of the raw body with the app secret)."""
-    if not header or not header.startswith('sha256='):
+    if not isinstance(header, str) or not re.fullmatch(r'sha256=[0-9a-fA-F]{64}', header):
         return False
     expected = hmac.new(app_secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, header[len('sha256='):])
+    return hmac.compare_digest(expected, header[len('sha256='):].lower())
 
 
 def subscription_challenge(params, verify_token):
