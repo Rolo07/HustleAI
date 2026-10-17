@@ -73,7 +73,7 @@ class GroundedCustomerReplyTests(unittest.TestCase):
             self.assertIn('pack sizes only when explicitly present', prompt)
             self.assertIn('"date": "2026-10-01"', prompt)
             self.assertIn('"necks": "Chicken necks"', prompt)
-            self.assertEqual(agent.return_value.ask.call_args.args[0], 'Customer message (untrusted):\n10 kg chicken meal')
+            self.assertIn('Customer message (untrusted):\n10 kg chicken meal', agent.return_value.ask.call_args.args[0])
 
     def test_missing_catalogue_prevents_ungrounded_generation(self):
         from hustleai.dashboard.adapters import LiveBusiness

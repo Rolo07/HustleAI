@@ -115,7 +115,7 @@ class DashboardTests(unittest.TestCase):
 
     def test_hermes_generation_race_is_discarded(self):
         started, finish = threading.Event(), threading.Event()
-        def agent(phone, text):
+        def agent(phone, text, transcript=None):
             started.set()
             finish.wait(2)
             return 'Proposed reply'
@@ -128,6 +128,28 @@ class DashboardTests(unittest.TestCase):
         finish.set()
         thread.join(3)
         self.assertIsNone(self.c()['suggestion'])
+        self.assertFalse(self.journal.read()['outbox'])
+
+    def test_short_reply_receives_delivered_context_without_private_or_unsent_text(self):
+        from hustleai.dashboard.engine import message
+        with self.journal.locked():
+            state = self.journal.read()
+            c = state['conversations'][self.cid]
+            c['messages'] = []
+            message(c, 'customer', 'Another 10 kg please')
+            message(c, 'hermes', 'Would you like 10 kg of Bushveld Harvest again?', 'read')
+            message(c, 'note', 'Private owner note')
+            message(c, 'hermes', 'Failed alternative', 'failed')
+            message(c, 'owner', 'Unsent alternative', 'queued')
+            c['suggestion'] = {'id': 'unsent', 'text': 'Unsent proposal', 'epoch': c['epoch']}
+            self.journal.write(state)
+        with patch.object(self.business, 'agent', return_value='Thank you, 10 kg of Bushveld Harvest noted for review.') as agent:
+            self.engine.demo_inbound(self.cid, 'Yes', 'yes-context')
+            self.engine.handle_event('yes-context')
+            agent.assert_called_once_with(self.cid, 'Yes', [
+                {'actor': 'customer', 'text': 'Another 10 kg please'},
+                {'actor': 'hermes', 'text': 'Would you like 10 kg of Bushveld Harvest again?'}])
+        self.assertIn('noted for review', self.c()['suggestion']['text'])
         self.assertFalse(self.journal.read()['outbox'])
 
     def test_rejection_keeps_draft_unsent_and_records_reason(self):

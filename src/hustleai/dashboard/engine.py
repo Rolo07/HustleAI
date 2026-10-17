@@ -378,15 +378,22 @@ class Engine:
                 return
             # Free-text changes cannot be guessed. Hermes proposes wording only.
             epoch = c['epoch']
+            # Only customer messages and provider-confirmed outbound messages are
+            # conversation evidence. Unsent proposals, notes and failed sends
+            # must never be treated as something the customer has seen.
+            transcript = [{'actor': m['actor'], 'text': m['text'][:3500]}
+                          for m in c['messages'][:-1]
+                          if m['actor'] == 'customer' or
+                          (m['actor'] in ('hermes', 'owner') and m.get('status') in ('sent', 'delivered', 'read'))][-20:]
         try:
-            reply = self.business.agent(event['from'], text)
+            reply = self.business.agent(event['from'], text, transcript)
         except Exception as error:
             reply, failure = None, type(error).__name__
             self.connected['hermes'] = 'Unavailable (' + failure + ')'
         with self.journal.locked():
             state = self.journal.read()
             c = state['conversations'][event['from']]
-            if c['mode'] != 'hermes' or c['epoch'] != epoch:
+            if c['mode'] != 'hermes' or c['epoch'] != epoch or c['messages'][-1]['id'] != event_id:
                 audit(state, c['id'], 'Hermes result discarded', 'Conversation taken over during generation')
             elif reply:
                 self.connected['hermes'] = 'Responding · proposals require approval' if not self.demo else 'Simulated'

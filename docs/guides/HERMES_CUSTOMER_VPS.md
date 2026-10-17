@@ -229,3 +229,11 @@ eligible history. It never permits drafts, overrides ambiguous customer matches
 or tied real history, affects another phone, or changes quote/forecast rules.
 Leave it empty outside that test. Runtime configuration is included in encrypted
 private-file backups, not committed to Git.
+
+Dashboard drafts also receive the last 20 customer/delivered conversation entries.
+Owner-only notes, unsent proposals, queued/failed sends and API acceptance without
+a sent/delivered/read status are excluded. A short “yes” is interpreted against
+the delivered question: acknowledge the selected product and quantity rather
+than repeating the product confirmation. This does not bypass priced-order
+confirmation or owner approval, and does not create an invoice. Replies generated
+against a conversation that changes during generation are discarded.
