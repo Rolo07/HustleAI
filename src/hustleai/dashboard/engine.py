@@ -47,11 +47,11 @@ def public_order(quote, previous=None):
 
 
 def proposal_text(order):
-    lines = ['RG Midrand · proposed reorder', *[
+    lines = ['Sure, here are your order details:', *[
         f"{line['name']}: {line['quantity']} × R{line['rate']}" for line in order['lines']],
         *([f"Delivery: R{order['shipping_charge']}"] if float(order.get('shipping_charge', 0)) else []),
-        f"Total: R{order['total']} ZAR", order['tax'], 'Due seven days from draft creation.',
-        'Please reply CONFIRM ' + order['version'] + ' to confirm this exact order. Changes need a new confirmation.']
+        f"Total: R{order['total']} ZAR", order['tax'], 'Payment is due seven days from the invoice date.',
+        'If everything looks right, reply CONFIRM ' + order['version'] + ' so we can go ahead. If you’d like a change, just let us know.']
     return '\n'.join(lines)
 
 

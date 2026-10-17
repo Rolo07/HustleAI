@@ -259,3 +259,10 @@ sources and renamed delivery items require clarification rather than guessing.
 Changes to delivery or total invalidate the previous confirmation before any
 invoice write. Ordinary draft creation and owner-approved delivery remain guarded
 by the existing workflow; this reply wording does not trigger invoice creation.
+
+All generated customer replies use the same friendly, direct, practical tone:
+plain words, natural contractions and usually one or two short sentences.
+Greetings, product questions, clarifications and follow-ups avoid formal inquiry
+language and repeated canned openings. Order summaries and invoice captions use
+matching wording while retaining exact prices, delivery charges and confirmation
+requirements. Manually written owner messages retain the owner's own wording.

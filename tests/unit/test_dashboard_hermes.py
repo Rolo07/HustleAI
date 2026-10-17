@@ -71,6 +71,7 @@ class GroundedCustomerReplyTests(unittest.TestCase):
             self.assertIn('["Chicken necks"]', prompt)
             self.assertIn('Do not invent products', prompt)
             self.assertIn('Never mention owner review', prompt)
+            self.assertIn('For every customer response, use a friendly', prompt)
             self.assertNotIn('say pricing and availability need owner review', prompt)
             self.assertIn('pack sizes only when explicitly present', prompt)
             self.assertIn('"date": "2026-10-01"', prompt)

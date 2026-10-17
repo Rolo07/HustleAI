@@ -179,7 +179,7 @@ class LiveBusiness:
                 bound = service.check_approval(approval['approval_id'])
                 if bound['recipient'] != phone or bound['version'] != order['invoice_version']:
                     raise ValueError('Approval binding changed.')
-                return client.send_document(phone, bound['pdf_path'], 'RG-Midrand-order.pdf', 'Your reviewed RG Midrand order.')
+                return client.send_document(phone, bound['pdf_path'], 'RG-Midrand-order.pdf', 'Here’s your invoice from RG Midrand.')
 
     def invalidate(self, order):
         if order.get('invoice_id'):
@@ -261,6 +261,12 @@ class LiveBusiness:
         aliases = self.product_aliases(catalog)
         instructions = (
             'Draft a short customer reply for Roland to review, speaking for RG Midrand. '
+            'For every customer response, use a friendly, confident, practical conversational tone: '
+            'warm and direct, like "Sure, let me check that for you." Use plain words and natural contractions. '
+            'Usually use one or two short sentences, answer the actual message and give a relevant next step. '
+            'Avoid corporate wording such as "thank you for your inquiry", "kindly", "please be advised" '
+            'or repeated formal greetings. Do not start every reply with the same phrase or add unnecessary questions. '
+            'Keep this tone for greetings, product questions, clarifications, reorder replies and follow-ups. '
             'Do not run tools or claim completed actions. The current catalogue below is the only evidence of supplied products. '
             'Use the delivered conversation transcript to interpret short replies such as yes or no. '
             'If the customer says yes to the latest delivered product/quantity question, acknowledge that exact selection; '
@@ -292,7 +298,7 @@ class LiveBusiness:
             'If neither aliases nor verified history identify a catalogue product, ask which product from the RG Midrand catalogue they mean; '
             'do not offer invented interpretations or repeat an unlisted term as if it were a product. '
             'Only when there is no grounded candidate for an unlisted or ambiguous product request, reply exactly: '
-            '"Could you please confirm which product from the RG Midrand catalogue you would like?" '
+            '"Sure, which product from our catalogue would you like?" '
             'Do not ask about packaging, collection or delivery until a supplied product has been identified. '
             'Use units or pack sizes only when explicitly present in the product name. '
             'Do not confirm an order or availability; validated order review and owner approval are required. '
@@ -354,4 +360,4 @@ class DemoBusiness:
         return 'DEMO-' + order['version']
 
     def agent(self, phone, text, transcript=None):
-        return 'Thanks for contacting RG Midrand. I’ll check the details with Roland before confirming your request.'
+        return 'Sure, let me check that for you.'
