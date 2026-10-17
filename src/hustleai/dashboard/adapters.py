@@ -5,6 +5,7 @@ from pathlib import Path
 import os
 import json
 import re
+import time
 
 from hustleai.integrations.whatsapp.owner_agent import OwnerAgent
 from hustleai.workflows.invoice_review import fingerprint
@@ -40,14 +41,44 @@ class LiveBusiness:
     def __init__(self, root):
         self.root = Path(root)
 
-    def quote(self, phone, desired=None):
+    def reorder_source(self, service, phone):
+        try:
+            return service.reorder_invoice(phone)
+        except ValueError as error:
+            from hustleai.integrations.whatsapp.test_assistant import RECIPIENT
+            from hustleai.workflows.invoice_review import ORDER_STATUSES
+            fixture_id = os.getenv('HUSTLEAI_TEST_HISTORY_INVOICE', '')
+            if phone != RECIPIENT or not fixture_id or not str(error).startswith('No eligible previous order'):
+                raise
+            invoice = service.invoice(phone, identifier(fixture_id))
+            if invoice.get('status') not in ORDER_STATUSES:
+                raise ValueError('The approved test invoice must be issued, not a draft or void.')
+            active = [x for x in service.api.pages('items', 'items') if x.get('status') == 'active']
+            rows = []
+            for line in invoice.get('line_items', []):
+                name = str(line.get('name', '')).removeprefix('TEST ONLY - ').removesuffix(' - delete after integration test')
+                matches = [x for x in active if str(x['item_id']) == str(line.get('item_id'))]
+                if not matches:
+                    matches = [x for x in active if x.get('name') == name]
+                if len(matches) != 1:
+                    raise ValueError('Test invoice product has no unique active catalogue match.')
+                issues = ['Historical discount requires explicit review.'] if line.get('discount') or line.get('discount_amount') else []
+                rows.append({'previous_line': line, 'current_product': matches[0], 'review_required': issues})
+            blockers = [f'Review historical {field}; it is not carried forward automatically.'
+                        for field in ('shipping_charge', 'adjustment', 'discount_total', 'discount') if invoice.get(field)]
+            return {'source_invoice': invoice, 'lines': rows, 'review_required': blockers, 'test_fixture': True}
+
+    def prepare_quote(self, phone):
+        return self.quote(phone, allow_unknown_stock=True)
+
+    def quote(self, phone, desired=None, stock_confirmations=None, allow_unknown_stock=False):
         with Service(root=self.root) as service:
             if service.tenant.currency != 'ZAR' or service.tenant.payment_terms_days != 7:
                 raise ValueError('Reorders require ZAR and seven-day payment terms.')
             # Unknown VAT treatment is an escalation, never an inferred value.
             if service.tenant.vat_registered is not False:
                 raise ValueError('VAT-inclusive catalog treatment requires explicit configuration before automated reorders.')
-            prior = service.reorder_invoice(phone)
+            prior = self.reorder_source(service, phone)
             shipping, delivery = paid_delivery(prior)
             blockers = [issue for issue in prior['review_required']
                         if not (shipping and issue == 'Review historical shipping_charge; it is not carried forward automatically.')]
@@ -72,27 +103,35 @@ class LiveBusiness:
                 grouped[item_id] = Decimal(charge['quantity'])
             quantities = [{'item_id': item_id, 'quantity': str(qty)} for item_id, qty in grouped.items()]
             lines = []
+            owner_stock = {}
             for requested in quantities:
                 item = service.api.get('items/' + identifier(requested['item_id']))['item']
                 quantity = Decimal(str(requested['quantity']))
                 rate = Decimal(delivery[requested['item_id']]['rate']) if requested['item_id'] in delivery else Decimal(str(item.get('rate', 'NaN')))
                 stock = item.get('available_stock', item.get('stock_on_hand'))
+                if stock is None and requested['item_id'] in (stock_confirmations or {}):
+                    stock = str(stock_confirmations[requested['item_id']])
+                    owner_stock[requested['item_id']] = stock
                 if item.get('status') != 'active' or not quantity.is_finite() or quantity <= 0 or not rate.is_finite() or rate <= 0:
                     raise ValueError('Product, quantity or current price is unavailable.')
                 is_delivery = requested['item_id'] in delivery
                 if is_delivery and not re.fullmatch(r'delivery(?:\s+\d+)?', str(item.get('name', '')).strip(), re.I):
                     raise ValueError('Historical delivery item changed; owner clarification required.')
-                if not is_delivery and (stock is None or not Decimal(str(stock)).is_finite() or Decimal(str(stock)) < quantity):
+                if not is_delivery and stock is None and not allow_unknown_stock:
+                    raise ValueError('Stock is not recorded in Zoho. Edit the order and confirm physical stock before sending.')
+                if not is_delivery and stock is not None and (not Decimal(str(stock)).is_finite() or Decimal(str(stock)) < quantity):
                     raise ValueError('Availability is unknown or insufficient; owner verification required.')
                 lines.append({'item_id': str(item['item_id']), 'name': item['name'], 'quantity': str(quantity),
-                              'rate': str(rate), 'available': str(quantity if is_delivery else stock),
+                              'rate': str(rate), 'available': str(quantity if is_delivery else stock) if stock is not None or is_delivery else None,
+                              'stock_verified': is_delivery or stock is not None, 'unit': item.get('unit', ''),
                               'is_delivery': is_delivery, 'no_tax': True})
             day = datetime.now(service.tenant.zone).date().isoformat()
             payload, preview = service.build_invoice(phone, lines, day)
             if shipping:
                 payload['shipping_charge'] = float(shipping)
             total = Decimal(preview['estimated_total']) + shipping
-            return {'lines': lines, 'shipping_charge': str(shipping), 'total': str(total.quantize(Decimal('.01'))), 'tax': 'Not VAT-registered · no VAT',
+            return {'lines': lines, 'test_order': bool(prior.get('test_fixture')), 'owner_stock': owner_stock, 'owner_stock_at': time.time(),
+                    'shipping_charge': str(shipping), 'total': str(total.quantize(Decimal('.01'))), 'tax': 'Not VAT-registered · no VAT',
                     'currency': 'ZAR', 'customer_id': payload['customer_id'], 'customer_name': preview['customer_name'],
                     'source_id': str(prior['source_invoice']['invoice_id']), 'payload': payload}
 
@@ -104,7 +143,8 @@ class LiveBusiness:
 
     def draft(self, phone, order):
         with Service(root=self.root) as service:
-            current = self.quote(phone, order['lines'])
+            owner_stock = order.get('owner_stock', {}) if time.time() - order.get('owner_stock_at', 0) <= 1800 else {}
+            current = self.quote(phone, order['lines'], stock_confirmations=owner_stock)
             if (Decimal(current['total']) != Decimal(order['total']) or
                     Decimal(current.get('shipping_charge', '0')) != Decimal(order.get('shipping_charge', '0'))):
                 raise ValueError('Delivery charge or total changed; obtain confirmation again.')
@@ -113,7 +153,7 @@ class LiveBusiness:
             if current['customer_id'] != order['customer_id']:
                 raise ValueError('Customer association changed; owner resolution required.')
             payload = current['payload']
-            payload['reference_number'] = 'HUSTLE-' + order['version']
+            payload['reference_number'] = ('TEST-HUSTLE-' if current.get('test_order') else 'HUSTLE-') + order['version']
             if order.get('invoice_id'):
                 iid = order['invoice_id']
                 with service.invoice_lock(iid):
@@ -152,9 +192,9 @@ class LiveBusiness:
     def reconcile(self, phone, order):
         with Service(root=self.root) as service:
             customer = service.customer(phone)
-            reference = 'HUSTLE-' + order['version']
+            references = {'HUSTLE-' + order['version'], 'TEST-HUSTLE-' + order['version']}
             matches = [row for row in service.api.pages('invoices?customer_id=' + identifier(customer['contact_id']), 'invoices')
-                       if row.get('reference_number') == reference]
+                       if row.get('reference_number') in references]
             if len(matches) != 1:
                 raise ValueError('No unique draft with this order reference. Do not retry creation until Zoho is manually reconciled.')
             iid = str(matches[0]['invoice_id'])

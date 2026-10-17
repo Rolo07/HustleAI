@@ -62,6 +62,28 @@ class DashboardTests(unittest.TestCase):
             self.action('approve', {'version': self.c()['order']['version']})
         self.assertFalse(self.journal.read()['outbox'])
 
+    def test_prepare_reorder_is_reviewable_and_does_not_send(self):
+        self.action('prepare_reorder')
+        self.assertTrue(self.c()['order']['prepared_only'])
+        self.assertFalse(self.journal.read()['outbox'])
+        self.action('edit', {'version': self.c()['order']['version'], 'lines': [{'item_id': 'chicken', 'quantity': '10'}]})
+        self.assertTrue(self.c()['order']['prepared_only'])
+        self.assertFalse(self.journal.read()['outbox'])
+        self.action('send_proposal')
+        self.assertEqual(len(self.journal.read()['outbox']), 1)
+
+    def test_expired_physical_stock_confirmation_blocks_before_draft_creation(self):
+        with self.journal.locked():
+            state = self.journal.read()
+            order = state['conversations'][self.cid]['order']
+            order['owner_stock'] = {'chicken': '10'}
+            order['owner_stock_at'] = time.time() - 1801
+            self.journal.write(state)
+        with patch.object(self.business, 'draft') as draft:
+            self.confirm('expired-stock')
+            draft.assert_not_called()
+        self.assertEqual(self.c()['order']['status'], 'awaiting_customer')
+
     def test_stale_confirmation_and_edit_invalidate(self):
         old = self.c()['order']['version']
         self.action('edit', {'version': old, 'lines': [{'item_id': 'chicken', 'quantity': '8'}]})

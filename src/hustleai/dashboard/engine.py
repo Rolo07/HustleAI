@@ -188,19 +188,27 @@ class Engine:
                 if action == 'clarify':
                     c['escalation'] = 'Clarification requested; customer response pending.'
                     audit(state, cid, 'Clarification requested')
-            elif action in ('reorder', 'edit'):
+            elif action in ('prepare_reorder', 'reorder', 'edit'):
                 if order and order['status'] in ('sending', 'sent', 'draft_creating', 'draft_uncertain', 'delivery_uncertain'):
                     raise ValueError('An attempted draft or delivery must be reconciled before editing.')
                 if action == 'edit' and (not order or data.get('version') != order['version']):
                     raise ValueError('Order version changed; refresh before editing.')
                 desired = data.get('lines') if action == 'edit' else None
-                quote = self.business.quote(c['phone'], desired)
+                if action == 'prepare_reorder':
+                    quote = getattr(self.business, 'prepare_quote', self.business.quote)(c['phone'])
+                elif data.get('stock_confirmations'):
+                    quote = self.business.quote(c['phone'], desired, stock_confirmations=data['stock_confirmations'])
+                else:
+                    quote = self.business.quote(c['phone'], desired)
                 if order:
                     self.business.invalidate(order)
                     self.cancel_order_messages(state, cid)
                 c['order'] = public_order(quote, order)
+                c['order']['prepared_only'] = action == 'prepare_reorder' or bool(order and order.get('prepared_only'))
                 c['escalation'] = ''
-                if c['mode'] == 'hermes':
+                if c['order']['prepared_only']:
+                    c['escalation'] = 'Order prepared, not sent. Review quantities and confirm stock in Edit, then send the proposal.'
+                elif c['mode'] == 'hermes':
                     self.queue(state, c, proposal_text(c['order']), key='proposal:' + c['order']['version'])
                 else:
                     c['escalation'] = 'Updated proposal is ready. Resume Hermes before sending it.'
@@ -208,6 +216,10 @@ class Engine:
             elif action == 'send_proposal':
                 if not order or order['status'] != 'awaiting_customer' or c['mode'] != 'hermes':
                     raise ValueError('Resume Hermes and prepare a current proposal first.')
+                if any(not line.get('stock_verified', True) for line in order['lines']):
+                    raise ValueError('Edit the order and confirm physical stock before sending the proposal.')
+                if order.get('owner_stock') and time.time() - order.get('owner_stock_at', 0) > 1800:
+                    raise ValueError('Physical stock confirmation expired. Edit and confirm stock again.')
                 self.queue(state, c, proposal_text(order), key='proposal:' + order['version'])
             elif action == 'reject':
                 if not order or data.get('version') != order['version'] or order['status'] not in ('needs_approval', 'awaiting_customer'):
@@ -346,6 +358,11 @@ class Engine:
                 version = text[8:].strip()
                 if not order or version != order['version'] or order['status'] != 'awaiting_customer':
                     c['escalation'] = 'Confirmation is stale or unclear; no new draft created.'
+                    self.journal.write(state)
+                    return
+                if (any(not line.get('stock_verified', True) for line in order['lines']) or
+                        (order.get('owner_stock') and time.time() - order.get('owner_stock_at', 0) > 1800)):
+                    c['escalation'] = 'Physical stock must be confirmed before an invoice can be prepared.'
                     self.journal.write(state)
                     return
                 # Persist before provider mutation; uncertain outcomes never retried.

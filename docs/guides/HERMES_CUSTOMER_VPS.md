@@ -226,7 +226,7 @@ For the existing verified WhatsApp test recipient only,
 `HUSTLEAI_TEST_HISTORY_INVOICE` can name an explicitly approved issued test
 invoice. It is a read-only context fallback when ordinary lookup finds no
 eligible history. It never permits drafts, overrides ambiguous customer matches
-or tied real history, affects another phone, or changes quote/forecast rules.
+or tied real history, affects another phone, or changes forecast rules. Test quotes retain current catalogue price and stock checks.
 Leave it empty outside that test. Runtime configuration is included in encrypted
 private-file backups, not committed to Git.
 
@@ -266,3 +266,25 @@ Greetings, product questions, clarifications and follow-ups avoid formal inquiry
 language and repeated canned openings. Order summaries and invoice captions use
 matching wording while retaining exact prices, delivery charges and confirmation
 requirements. Manually written owner messages retain the owner's own wording.
+
+## Preparing an order when Zoho has no inventory quantity
+
+The owner's Prepare reorder button prepares an unsent priced proposal. It uses
+the approved test invoice for the fixed test recipient when ordinary eligible
+history is absent, mapping its product to the unique current active catalogue.
+It does not queue a customer message merely because preparation succeeded.
+
+Unknown stock is visible as Not checked. Use Edit to set the requested quantity
+and enter physically confirmed stock when Zoho does not track it. This is an
+owner confirmation for this proposal, not a change to Zoho inventory. Known Zoho
+stock cannot be overridden this way, and insufficient stock blocks proceeding.
+Physical confirmations expire after 30 minutes; refresh them before proceeding
+if necessary. Missing stock blocks sending a proposal and invoice preparation.
+The Send current proposal action remains explicit, followed by the customer's
+priced-version confirmation and the owner's PDF approval.
+
+Preparation errors are shown beside the order and in a toast, and preparation
+has a visible busy state. Current catalogue prices and paid delivery rules remain
+in force; no test product price or stock is invented.
+
+Draft invoices based on the approved test fixture receive a TEST-HUSTLE reference, so existing test exclusions keep them out of real-order forecasts.
