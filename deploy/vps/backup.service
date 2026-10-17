@@ -1,0 +1,19 @@
+[Unit]
+Description=Encrypted HustleAI tenant database and private file backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=hustleai-dashboard
+Group=hustleai-dashboard
+ExecStart=/opt/hustleai-dashboard/current/.venv/bin/python /opt/hustleai-dashboard/current/deploy/vps/backup.py --public-key /opt/hustleai-dashboard/backup-public.pem --output /var/backups/hustleai-dashboard/encrypted
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/hustleai-dashboard/encrypted
+MemoryMax=256M
+TasksMax=32
+

@@ -21,6 +21,7 @@ class OwnerAgent:
         self.model = settings.get('model') or 'default'
         self.api_key = settings.get('api_key')
         self.user = settings.get('user') or 'owner'
+        self.system_prompt = settings.get('system_prompt')
         # Hermes keeps one conversation per key across messages.
         self.session_key = settings.get('session_key') or session_key
 
@@ -31,8 +32,11 @@ class OwnerAgent:
             headers['Authorization'] = 'Bearer ' + self.api_key
         if self.session_key:
             headers['X-Hermes-Session-Key'] = self.session_key[:256]
+        messages = [{'role': 'user', 'content': text}]
+        if self.system_prompt:
+            messages.insert(0, {'role': 'system', 'content': self.system_prompt})
         body = json.dumps({'model': self.model, 'user': self.user,
-                           'messages': [{'role': 'user', 'content': text}]}).encode()
+                           'messages': messages}).encode()
         try:
             with urllib.request.urlopen(urllib.request.Request(self.url, body, headers), timeout=180, context=tls_context()) as response:
                 reply = json.load(response)['choices'][0]['message']['content']

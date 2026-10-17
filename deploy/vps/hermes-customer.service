@@ -1,0 +1,38 @@
+[Unit]
+Description=Isolated Hermes customer reply drafting API
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+User=hustleai-customer
+Group=hustleai-customer
+WorkingDirectory=/var/lib/hustleai-customer
+Environment=HOME=/var/lib/hustleai-customer
+Environment=HERMES_HOME=/var/lib/hustleai-customer/.hermes
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/local/bin/hermes -p rg-midrand-customer gateway run
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/hustleai-customer
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryHigh=192M
+MemoryMax=256M
+OOMScoreAdjust=500
+TasksMax=128
+CPUQuota=60%
+
+[Install]
+WantedBy=multi-user.target

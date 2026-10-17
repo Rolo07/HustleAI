@@ -1,0 +1,21 @@
+# Independent localhost-only proxy. Does not use the public Caddy configuration.
+{
+    admin off
+    auto_https off
+}
+http://:8087 {
+    bind 127.0.0.1
+    @meta {
+        path /webhook
+        method GET POST
+    }
+    handle @meta {
+        request_body {
+            max_size 1MB
+        }
+        reverse_proxy 127.0.0.1:8090
+    }
+    handle {
+        respond 404
+    }
+}

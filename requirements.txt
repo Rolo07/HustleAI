@@ -1,2 +1,4 @@
-mcp>=1.12,<2
-certifi
+# Audited core dependencies; optional extras are selected through pyproject.toml.
+-c requirements-lock.txt
+mcp>=1.30.0,<2
+certifi>=2026.7.22

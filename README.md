@@ -33,11 +33,15 @@ Root `zoho_*.py` scripts remain compatibility entry points. Make new changes in
 
 ## Install and run
 
-Python 3.11 or newer:
+Use a security-patched Python release (3.14.8 is configured for this project).
+See the [dependency security guide](docs/guides/DEPENDENCY_SECURITY.md) for the
+reviewed patch floors and latest audit.
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -e '.[postgres]'
+# Use your patched interpreter; on this Mac:
+/opt/homebrew/opt/python@3.14/bin/python3.14 -m venv .venv
+.venv/bin/python -m pip install -c requirements-lock.txt --upgrade pip setuptools
+.venv/bin/python -m pip install --no-build-isolation -c requirements-lock.txt -e '.[bank,postgres,hermes]'
 .venv/bin/hustleai-contacts lookup
 .venv/bin/python -m hustleai.mcp.owner_server
 ```
@@ -94,6 +98,20 @@ See the [browser and live-check report](docs/guides/DASHBOARD_QA.md) and
 reorders still require the restricted Hermes connection, authoritative stock
 availability and Meta inbound webhook access.
 
+
+## Bank statement reconciliation
+
+The owner dashboard now has a bank reconciliation view: upload a PDF or CSV,
+review extracted rows, match ZAR credits by client/reference/date/amount, and
+receive a potential missing-payment report in the dashboard, owner WhatsApp and
+configured email. Unique matches can prepare reviewed Zoho payment allocations;
+exact owner confirmation records received funds and lets Zoho settle the invoice.
+Ambiguous matches and uncertain writes remain blocked for review. See the
+[bank reconciliation guide](docs/guides/BANK_RECONCILIATION.md) for supported
+formats, email configuration and current integration limits. Local PDF extraction
+requires the optional PDF dependency.
+
+![Bank reconciliation report using fictional statement data](docs/screenshots/bank-reconciliation.jpg)
 
 ## WhatsApp gateway
 

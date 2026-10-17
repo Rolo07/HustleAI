@@ -8,6 +8,7 @@ from http.server import ThreadingHTTPServer
 import json
 import logging
 import os
+import re
 from pathlib import Path
 import secrets
 import threading
@@ -27,13 +28,26 @@ STATIC = Path(__file__).parent / 'static'
 LOG = logging.getLogger(__name__)
 
 
-def handler(engine, password=None):
+def handler(engine, password=None, public_origin=None):
+    public_origin = os.getenv('HUSTLEAI_PUBLIC_ORIGIN', '') if public_origin is None else public_origin
+    if public_origin:
+        if not re.fullmatch(r'https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?', public_origin):
+            raise ValueError('HUSTLEAI_PUBLIC_ORIGIN requires an HTTPS origin without a path.')
+        parsed = urllib.parse.urlsplit(public_origin)
+        if parsed.port is not None and not 1 <= parsed.port <= 65535:
+            raise ValueError('Invalid public origin port.')
+    public_host = urllib.parse.urlsplit(public_origin).netloc if public_origin else None
+    secure_cookie = '; Secure' if public_origin else ''
+    from hustleai.dashboard.bank import BankReconciliation
+    bank = BankReconciliation(engine)
     base = handler_for(engine)
     session_key = secrets.token_bytes(32)
     attempts = {}
 
     class Handler(base):
         def allowed_host(self):
+            if public_host:
+                return self.headers.get('Host') == public_host
             return self.headers.get('Host') in (f'127.0.0.1:{self.server.server_port}', f'localhost:{self.server.server_port}')
 
         def auth(self):
@@ -66,9 +80,9 @@ def handler(engine, password=None):
                 return super().do_GET()
             if not self.allowed_host():
                 return self.output(403, {'error': 'Invalid dashboard host.'})
-            if path in ('/', '/app.js', '/style.css'):
-                file = {'/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css'}[path]
-                mime = {'/': 'text/html; charset=utf-8', '/app.js': 'text/javascript', '/style.css': 'text/css'}[path]
+            if path in ('/', '/app.js', '/bank.js', '/style.css'):
+                file = {'/': 'index.html', '/app.js': 'app.js', '/bank.js': 'bank.js', '/style.css': 'style.css'}[path]
+                mime = {'/': 'text/html; charset=utf-8', '/app.js': 'text/javascript', '/bank.js': 'text/javascript', '/style.css': 'text/css'}[path]
                 return self.output(200, (STATIC / file).read_bytes(), mime)
             if not self.auth():
                 return self.output(401, {'error': 'Owner sign-in required.'})
@@ -78,6 +92,18 @@ def handler(engine, password=None):
                 except Exception as error:
                     LOG.error('Dashboard storage read failed: %s', type(error).__name__)
                     return self.output(503, {'error': 'Persistent storage unavailable; no sample fallback used.'})
+            if path == '/api/bank/reports':
+                try:
+                    return self.output(200, bank.reports())
+                except Exception:
+                    return self.output(503, {'error': 'Persistent bank reports unavailable; no sample fallback used.'})
+            if path == '/api/bank/report':
+                from hustleai.workflows.bank_reconciliation import markdown_report
+                rid = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('id', [''])[0]
+                try:
+                    return self.output(200, markdown_report(bank.report(rid)).encode(), 'text/markdown; charset=utf-8')
+                except ValueError as error:
+                    return self.output(404, {'error': str(error)})
             if path == '/api/catalog':
                 try:
                     return self.output(200, {'products': engine.business.products() if engine.demo else engine.business.catalog()})
@@ -96,10 +122,10 @@ def handler(engine, password=None):
                     return self.output(409, {'error': 'PDF missing, expired or changed. Request a fresh review.'})
             return self.output(404, {'error': 'Not found.'})
 
-        def body(self):
+        def body(self, limit=65536):
             try:
                 length = int(self.headers.get('Content-Length', '0'))
-                if not 0 < length <= 65536:
+                if not 0 < length <= limit:
                     raise ValueError('Invalid body size.')
                 data = json.loads(self.rfile.read(length))
                 if not isinstance(data, dict):
@@ -114,10 +140,13 @@ def handler(engine, password=None):
                 if engine.demo:
                     return self.output(403, {'error': 'Demo mode does not accept Meta events.'})
                 return super().do_POST()
-            if not self.allowed_host() or self.headers.get('Origin') != 'http://' + self.headers.get('Host', ''):
+            expected_origin = public_origin or 'http://' + self.headers.get('Host', '')
+            if not self.allowed_host() or self.headers.get('Origin') != expected_origin:
                 return self.output(403, {'error': 'Same-origin request required.'})
             try:
-                data = self.body()
+                if path.startswith('/api/bank/') and not self.auth():
+                    return self.output(401, {'error': 'Owner sign-in required.'})
+                data = self.body(8 * 1024 * 1024 if path.startswith('/api/bank/') else 65536)
                 if path == '/api/login':
                     ip = self.client_address[0]
                     recent = [stamp for stamp in attempts.get(ip, []) if time.time() - stamp < 60]
@@ -131,7 +160,7 @@ def handler(engine, password=None):
                     nonce = secrets.token_hex(16)
                     digest = hmac.new(session_key, (expiry + '.' + nonce).encode(), hashlib.sha256).hexdigest()
                     self.send_response(200)
-                    self.send_header('Set-Cookie', f'hustleai_owner={expiry}.{nonce}.{digest}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
+                    self.send_header('Set-Cookie', f'hustleai_owner={expiry}.{nonce}.{digest}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800{secure_cookie}')
                     self.send_header('Content-Length', '2')
                     self.send_header('Content-Type', 'application/json')
                     self.send_header('Cache-Control', 'no-store')
@@ -142,11 +171,30 @@ def handler(engine, password=None):
                     return self.output(401, {'error': 'Owner sign-in required.'})
                 if path == '/api/logout':
                     self.send_response(200)
-                    self.send_header('Set-Cookie', 'hustleai_owner=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
+                    self.send_header('Set-Cookie', 'hustleai_owner=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' + secure_cookie)
                     self.send_header('Content-Length', '2')
                     self.end_headers()
                     self.wfile.write(b'{}')
                     return
+                if path.startswith('/api/bank/'):
+                    if path == '/api/bank/extract':
+                        from hustleai.dashboard.bank_pdf import extract_pdf
+                        return self.output(200, extract_pdf(data.get('pdf'), data.get('password', '')))
+                    if path == '/api/bank/import':
+                        report = bank.import_csv(data)
+                        notice = bank.notify(report['id'])
+                        return self.output(200, {'report': report, 'notifications': notice})
+                    if path == '/api/bank/refresh':
+                        return self.output(200, bank.refresh(str(data.get('report_id'))))
+                    if path == '/api/bank/prepare':
+                        return self.output(200, bank.prepare(str(data.get('report_id')), int(data.get('row'))))
+                    if path == '/api/bank/confirm':
+                        return self.output(200, bank.confirm(str(data.get('key')), str(data.get('confirmation', ''))))
+                    if path == '/api/bank/assign':
+                        return self.output(200, bank.assign(str(data.get('report_id')), int(data.get('row')), str(data.get('invoice_id'))))
+                    if path == '/api/bank/notify':
+                        return self.output(200, bank.notify(str(data.get('report_id'))))
+                    return self.output(404, {'error': 'Not found.'})
                 cid = str(data.get('conversation', ''))
                 if path == '/api/action':
                     engine.action(cid, data.get('action'), data.get('data') or {}, data.get('request_id'))
@@ -198,7 +246,7 @@ def main():
         tenant = load_tenant(args.root)
         journal = Journal(args.root, tenant.organization_id)
         engine = Engine(journal, LiveBusiness(args.root), WhatsAppClient(settings), settings)
-        engine.connected['hermes'] = 'Configured · replies require approval' if os.getenv('HUSTLEAI_HERMES_URL') and os.getenv('HUSTLEAI_HERMES_CUSTOMER_PROFILE') == 'restricted' else 'Restricted customer profile not configured'
+        engine.connected['hermes'] = 'Configured · replies require approval' if os.getenv('HUSTLEAI_HERMES_URL') and os.getenv('HUSTLEAI_HERMES_CUSTOMER_PROFILE') in ('restricted', 'existing-restricted') else 'Restricted customer profile not configured'
         try:
             engine.client.number_info()
             engine.connected['whatsapp'] = 'Test account reachable · inbound publication blocked'

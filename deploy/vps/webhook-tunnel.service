@@ -1,0 +1,27 @@
+# Temporary Meta test callback. The hostname changes after a tunnel restart.
+# A stable production callback requires a domain and a managed tunnel/proxy.
+[Unit]
+Description=HustleAI temporary HTTPS Meta test callback
+Wants=network-online.target
+After=network-online.target hustleai-webhook-filter.service
+
+[Service]
+User=hustleai-dashboard
+Group=hustleai-dashboard
+Environment=HOME=/var/empty
+WorkingDirectory=/
+ExecStart=/opt/hustleai-dashboard/tools/cloudflared tunnel --no-autoupdate --protocol http2 --metrics 127.0.0.1:20241 --url http://127.0.0.1:8087
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=128M
+TasksMax=64
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

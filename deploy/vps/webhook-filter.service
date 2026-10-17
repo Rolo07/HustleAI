@@ -1,0 +1,24 @@
+[Unit]
+Description=HustleAI exact webhook route filter
+After=hustleai-dashboard.service
+
+[Service]
+User=hustleai-dashboard
+Group=hustleai-dashboard
+Environment=XDG_CONFIG_HOME=/tmp/hustleai-webhook-config
+Environment=XDG_DATA_HOME=/tmp/hustleai-webhook-data
+ExecStart=/usr/bin/caddy run --config /opt/hustleai-dashboard/current/deploy/vps/webhook.Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=80M
+TasksMax=64
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

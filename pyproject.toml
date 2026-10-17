@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,11 +7,12 @@ name = "hustleai"
 version = "0.1.0"
 description = "Owner-controlled Zoho workflows and Hermes MCP tools"
 requires-python = ">=3.11"
-dependencies = ["mcp>=1.12,<2", "certifi"]
+dependencies = ["mcp>=1.30.0,<2", "certifi>=2026.7.22"]
 
 [project.optional-dependencies]
-postgres = ["psycopg[binary]>=3.2,<4"]
-hermes = ["pyyaml>=6,<7"]
+bank = ["pdfplumber>=0.11.10,<0.12"]
+postgres = ["psycopg[binary]>=3.3.6,<4"]
+hermes = ["pyyaml>=6.0.3,<7"]
 
 [project.scripts]
 hustleai-mcp = "hustleai.mcp.owner_server:main"

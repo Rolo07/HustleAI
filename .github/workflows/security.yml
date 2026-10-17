@@ -1,0 +1,32 @@
+name: Dependency security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+          check-latest: true
+      - name: Install pinned audit tooling
+        run: python -m pip install -c requirements-lock.txt --upgrade pip setuptools certifi
+      - name: Audit exact lock and running interpreter
+        run: python scripts/audit_dependencies.py --lock requirements-lock.txt --installed --check-runtime --output dependency-audit.json
+      - name: Resolve every pinned optional dependency without installation
+        run: |
+          python -m pip install --dry-run --ignore-installed --only-binary=:all: -r requirements-lock.txt --report resolved-dependencies.json
+      - name: Audit actual resolved dependency tree
+        run: python scripts/audit_dependencies.py --pip-report resolved-dependencies.json --check-runtime --output resolved-audit.json

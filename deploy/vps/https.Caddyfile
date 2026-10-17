@@ -1,0 +1,52 @@
+# Independent HTTPS listener; the existing public HTTP Caddy service is untouched.
+{
+    admin off
+    auto_https disable_redirects
+    default_sni {$HUSTLEAI_PUBLIC_HOST}
+}
+
+https://{$HUSTLEAI_PUBLIC_HOST} {
+    tls {
+        issuer acme {
+            dir https://acme-v02.api.letsencrypt.org/directory
+            profile shortlived
+            disable_http_challenge
+        }
+    }
+
+    header Strict-Transport-Security "max-age=31536000"
+
+    @webhook {
+        path /webhook
+        method GET POST
+    }
+    handle @webhook {
+        request_body {
+            max_size 1MB
+        }
+        reverse_proxy 127.0.0.1:8090
+    }
+
+    @dashboard_get {
+        method GET
+        path / /app.js /bank.js /style.css /api/state /api/catalog /api/pdf /api/bank/reports /api/bank/report
+    }
+    handle @dashboard_get {
+        reverse_proxy 127.0.0.1:8090
+    }
+
+    @dashboard_post {
+        method POST
+        path /api/login /api/logout /api/action /api/bank/extract /api/bank/import /api/bank/refresh /api/bank/prepare /api/bank/confirm /api/bank/assign /api/bank/notify
+    }
+    handle @dashboard_post {
+        request_body {
+            max_size 8MB
+        }
+        reverse_proxy 127.0.0.1:8090
+    }
+
+    handle {
+        respond 404
+    }
+}

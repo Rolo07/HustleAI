@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted HustleAI backup
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+Unit=hustleai-backup.service
+
+[Install]
+WantedBy=timers.target

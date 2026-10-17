@@ -1,0 +1,36 @@
+[Unit]
+Description=HustleAI owner dashboard (Meta test account)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=hustleai-dashboard
+Group=hustleai-dashboard
+WorkingDirectory=/var/lib/hustleai-dashboard
+Environment=HUSTLEAI_DATA_DIR=/var/lib/hustleai-dashboard
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/hustleai-dashboard/current/.venv/bin/python -m hustleai.dashboard.server --live
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hustleai-dashboard
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryMax=320M
+TasksMax=128
+CPUQuota=60%
+
+[Install]
+WantedBy=multi-user.target

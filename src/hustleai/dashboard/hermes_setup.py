@@ -13,10 +13,13 @@ from hustleai.integrations.zoho.auth import tls_context
 PATH = '/p/rg-midrand-customer/v1/chat/completions'
 
 
-def check_restricted(url, key):
+def check_restricted(url, key, profile_mode='restricted'):
     parsed = urlsplit(url)
-    if parsed.path != PATH or parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise ValueError('Use the dedicated customer profile URL without embedded credentials.')
+    paths = {'restricted': PATH, 'existing-restricted': '/v1/chat/completions'}
+    if profile_mode not in paths or parsed.path != paths[profile_mode] or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError('Use the explicitly configured restricted Hermes endpoint without embedded credentials.')
+    if profile_mode == 'existing-restricted' and parsed.hostname not in ('127.0.0.1', 'localhost'):
+        raise ValueError('The existing restricted Hermes API must be on localhost.')
     if parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost')):
         raise ValueError('Use HTTPS, or localhost HTTP through a private SSH tunnel.')
     if not key:
@@ -61,7 +64,8 @@ def main():
                               'HUSTLEAI_HERMES_CUSTOMER_PROFILE': 'restricted'})
         print('Saved authenticated, tool-free customer profile connection privately.')
     else:
-        check_restricted(os.getenv('HUSTLEAI_HERMES_URL', ''), os.getenv('HUSTLEAI_HERMES_API_KEY', ''))
+        check_restricted(os.getenv('HUSTLEAI_HERMES_URL', ''), os.getenv('HUSTLEAI_HERMES_API_KEY', ''),
+                         os.getenv('HUSTLEAI_HERMES_CUSTOMER_PROFILE', 'restricted'))
         print('Customer Hermes profile reachable; API-server toolsets disabled.')
 
 

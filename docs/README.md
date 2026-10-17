@@ -14,5 +14,11 @@
 - [Hermes setup](guides/HERMES_SETUP.md): permissions and operating instructions.
 - [Supabase migration](../supabase/README.md): active hosted storage, verified migration and recovery.
 - [VPS deployment](../deploy/README.md): package installation and private-data configuration.
+- [Isolated VPS dashboard](guides/VPS_DASHBOARD.md): private access, exact HTTPS webhook routes, restartable services, encrypted backups and recovery.
+- [Stable VPS HTTPS](guides/STABLE_HTTPS.md): trusted HTTPS on the existing public IP, automatic renewal and Meta callback cutover without buying a domain.
 
 - [Database functions and queries](guides/DATABASE_FUNCTIONS.md): atomic workflow transitions, permissions and upgrades.
+
+- [Bank-statement reconciliation](guides/BANK_RECONCILIATION.md) — upload, match, review Zoho payments and owner reports.
+
+- [Dependency security and audit](guides/DEPENDENCY_SECURITY.md) — pinned packages, runtime policy and automatic checks.

@@ -1,0 +1,252 @@
+{
+  "checked_at": "2026-10-15T21:03:45.704460+00:00",
+  "sources": [
+    "https://api.osv.dev/v1/querybatch",
+    "https://pypi.org/pypi/{name}/{version}/json"
+  ],
+  "packages": [
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "anyio",
+      "version": "4.15.1",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "click",
+      "version": "8.5.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.1",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "httpx-sse",
+      "version": "0.4.3",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "jsonschema",
+      "version": "4.26.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "jsonschema-specifications",
+      "version": "2025.9.1",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "mcp",
+      "version": "1.30.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pdfminer-six",
+      "version": "20260107",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pdfplumber",
+      "version": "0.11.10",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pip",
+      "version": "26.2.1",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "psycopg",
+      "version": "3.3.6",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "psycopg-binary",
+      "version": "3.3.6",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pycparser",
+      "version": "3.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pydantic",
+      "version": "2.13.5",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pydantic-core",
+      "version": "2.46.5",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pydantic-settings",
+      "version": "2.15.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pyjwt",
+      "version": "2.15.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pypdfium2",
+      "version": "5.14.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.3",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.32",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.3",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "referencing",
+      "version": "0.37.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "rpds-py",
+      "version": "2026.6.3",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "setuptools",
+      "version": "84.0.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "sse-starlette",
+      "version": "3.4.11",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "starlette",
+      "version": "1.7.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.4",
+      "advisories": [],
+      "yanked": false
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.54.0",
+      "advisories": [],
+      "yanked": false
+    }
+  ],
+  "errors": [],
+  "ok": true,
+  "runtime": {
+    "version": "3.14.8",
+    "minimum": "3.14.8",
+    "ok": true,
+    "policy_reviewed_on": "2026-10-15",
+    "source": "https://blog.python.org/2026/10/python-31022-31117/"
+  }
+}

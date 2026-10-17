@@ -199,6 +199,43 @@ class DashboardTests(unittest.TestCase):
         self.engine.tick()
         self.assertEqual(self.c()['messages'][-1]['status'], 'read')
 
+    def test_https_proxy_auth_rejects_spoofed_origin_and_sets_secure_cookie(self):
+        self.engine.demo = False
+        origin = 'https://dashboard.example.com'
+        server = ThreadingHTTPServer(('127.0.0.1', 0), handler(self.engine, 'a-secure-owner-password', origin))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f'http://127.0.0.1:{server.server_port}'
+        def req(path, data=None, **headers):
+            try:
+                request = urllib.request.Request(base + path, json.dumps(data).encode() if data is not None else None, headers)
+                with urllib.request.urlopen(request, timeout=3) as response:
+                    return response.status, response.headers
+            except urllib.error.HTTPError as error:
+                with error:
+                    return error.code, error.headers
+        try:
+            login = {'password': 'a-secure-owner-password'}
+            self.assertEqual(req('/api/login', login, Host='dashboard.example.com', Origin='https://attacker.example', **{'X-Forwarded-Host': 'dashboard.example.com', 'X-Forwarded-Proto': 'https'})[0], 403)
+            self.assertEqual(req('/api/login', login, Host='localhost', Origin=origin)[0], 403)
+            self.assertEqual(req('/api/login', login, Host='dashboard.example.com', Origin='http://dashboard.example.com')[0], 403)
+            self.assertEqual(req('/api/state', Host='dashboard.example.com')[0], 401)
+            status, headers = req('/api/login', login, Host='dashboard.example.com', Origin=origin)
+            self.assertEqual(status, 200)
+            self.assertIn('; Secure', headers['Set-Cookie'])
+            cookie = headers['Set-Cookie'].split(';')[0]
+            self.assertEqual(req('/api/state', Host='dashboard.example.com', Cookie=cookie)[0], 200)
+            status, headers = req('/api/logout', {}, Host='dashboard.example.com', Origin=origin, Cookie=cookie)
+            self.assertEqual(status, 200)
+            self.assertIn('; Secure', headers['Set-Cookie'])
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_invalid_public_origins_fail_closed(self):
+        for origin in ('http://dashboard.example.com', 'https://dashboard.example.com/', 'https://user:secret@dashboard.example.com', 'https://dashboard.example.com?x=1', 'https://dashboard.example.com:99999'):
+            with self.subTest(origin=origin), self.assertRaises(ValueError):
+                handler(self.engine, 'a-secure-owner-password', origin)
+
     def test_live_http_auth_and_csrf(self):
         self.engine.demo = False
         server = ThreadingHTTPServer(('127.0.0.1', 0), handler(self.engine, 'a-secure-owner-password'))

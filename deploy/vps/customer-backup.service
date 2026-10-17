@@ -1,0 +1,17 @@
+[Unit]
+Description=Encrypted isolated Hermes customer configuration backup
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/hustleai-dashboard/current/.venv/bin/python /opt/hustleai-dashboard/current/deploy/vps/backup_customer.py
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/hustleai-dashboard/encrypted
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH
+MemoryMax=64M
+TasksMax=16
