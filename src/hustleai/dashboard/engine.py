@@ -49,6 +49,7 @@ def public_order(quote, previous=None):
 def proposal_text(order):
     lines = ['RG Midrand · proposed reorder', *[
         f"{line['name']}: {line['quantity']} × R{line['rate']}" for line in order['lines']],
+        *([f"Delivery: R{order['shipping_charge']}"] if float(order.get('shipping_charge', 0)) else []),
         f"Total: R{order['total']} ZAR", order['tax'], 'Due seven days from draft creation.',
         'Please reply CONFIRM ' + order['version'] + ' to confirm this exact order. Changes need a new confirmation.']
     return '\n'.join(lines)

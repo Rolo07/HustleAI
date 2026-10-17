@@ -4,11 +4,36 @@ from decimal import Decimal
 from pathlib import Path
 import os
 import json
+import re
 
 from hustleai.integrations.whatsapp.owner_agent import OwnerAgent
 from hustleai.workflows.invoice_review import fingerprint
 from hustleai.workflows.service import Service
 from hustleai.domain.validation import identifier
+
+
+def paid_delivery(prior):
+    """Carry only explicit, undiscounted delivery charges on a fully paid invoice."""
+    invoice = prior['source_invoice']
+    shipping = Decimal(str(invoice.get('shipping_charge') or '0'))
+    if not shipping.is_finite() or shipping < 0:
+        raise ValueError('Historical delivery charge requires clarification.')
+    delivery = {}
+    for row in prior['lines']:
+        line = row['previous_line']
+        if not re.fullmatch(r'delivery(?:\s+\d+)?', str(line.get('name', '')).strip(), re.I):
+            continue
+        iid = identifier(line.get('item_id'))
+        quantity, rate = Decimal(str(line['quantity'])), Decimal(str(line['rate']))
+        if (iid in delivery or not quantity.is_finite() or quantity <= 0 or
+                not rate.is_finite() or rate <= 0 or line.get('discount') or line.get('discount_amount')):
+            raise ValueError('Historical delivery line requires clarification.')
+        delivery[iid] = {'quantity': str(quantity), 'rate': str(rate)}
+    if shipping and delivery:
+        raise ValueError('Two delivery charge sources require clarification before carrying forward.')
+    if (shipping or delivery) and invoice.get('status') != 'paid':
+        raise ValueError('Previous delivery charge is not fully paid; owner clarification required.')
+    return shipping, delivery
 
 
 class LiveBusiness:
@@ -23,7 +48,10 @@ class LiveBusiness:
             if service.tenant.vat_registered is not False:
                 raise ValueError('VAT-inclusive catalog treatment requires explicit configuration before automated reorders.')
             prior = service.reorder_invoice(phone)
-            if prior['review_required'] or any(line['review_required'] for line in prior['lines']):
+            shipping, delivery = paid_delivery(prior)
+            blockers = [issue for issue in prior['review_required']
+                        if not (shipping and issue == 'Review historical shipping_charge; it is not carried forward automatically.')]
+            if blockers or any(line['review_required'] for line in prior['lines']):
                 raise ValueError('Historical charges, discounts or products require owner clarification.')
             quantities = desired if desired is not None else [{'item_id': str(row['current_product']['item_id']),
                                        'quantity': row['previous_line']['quantity']} for row in prior['lines']]
@@ -35,23 +63,36 @@ class LiveBusiness:
                 qty = Decimal(str(row['quantity']))
                 if not qty.is_finite() or qty <= 0:
                     raise ValueError('Quantity must be a finite positive value.')
+                if item_id in delivery:
+                    if qty != Decimal(delivery[item_id]['quantity']):
+                        raise ValueError('Carried delivery charge cannot be changed as a product quantity.')
+                    continue
                 grouped[item_id] = grouped.get(item_id, Decimal('0')) + qty
+            for item_id, charge in delivery.items():
+                grouped[item_id] = Decimal(charge['quantity'])
             quantities = [{'item_id': item_id, 'quantity': str(qty)} for item_id, qty in grouped.items()]
             lines = []
             for requested in quantities:
                 item = service.api.get('items/' + identifier(requested['item_id']))['item']
                 quantity = Decimal(str(requested['quantity']))
-                rate = Decimal(str(item.get('rate', 'NaN')))
+                rate = Decimal(delivery[requested['item_id']]['rate']) if requested['item_id'] in delivery else Decimal(str(item.get('rate', 'NaN')))
                 stock = item.get('available_stock', item.get('stock_on_hand'))
                 if item.get('status') != 'active' or not quantity.is_finite() or quantity <= 0 or not rate.is_finite() or rate <= 0:
                     raise ValueError('Product, quantity or current price is unavailable.')
-                if stock is None or not Decimal(str(stock)).is_finite() or Decimal(str(stock)) < quantity:
+                is_delivery = requested['item_id'] in delivery
+                if is_delivery and not re.fullmatch(r'delivery(?:\s+\d+)?', str(item.get('name', '')).strip(), re.I):
+                    raise ValueError('Historical delivery item changed; owner clarification required.')
+                if not is_delivery and (stock is None or not Decimal(str(stock)).is_finite() or Decimal(str(stock)) < quantity):
                     raise ValueError('Availability is unknown or insufficient; owner verification required.')
                 lines.append({'item_id': str(item['item_id']), 'name': item['name'], 'quantity': str(quantity),
-                              'rate': str(rate), 'available': str(stock), 'no_tax': True})
+                              'rate': str(rate), 'available': str(quantity if is_delivery else stock),
+                              'is_delivery': is_delivery, 'no_tax': True})
             day = datetime.now(service.tenant.zone).date().isoformat()
             payload, preview = service.build_invoice(phone, lines, day)
-            return {'lines': lines, 'total': preview['estimated_total'], 'tax': 'Not VAT-registered · no VAT',
+            if shipping:
+                payload['shipping_charge'] = float(shipping)
+            total = Decimal(preview['estimated_total']) + shipping
+            return {'lines': lines, 'shipping_charge': str(shipping), 'total': str(total.quantize(Decimal('.01'))), 'tax': 'Not VAT-registered · no VAT',
                     'currency': 'ZAR', 'customer_id': payload['customer_id'], 'customer_name': preview['customer_name'],
                     'source_id': str(prior['source_invoice']['invoice_id']), 'payload': payload}
 
@@ -64,6 +105,9 @@ class LiveBusiness:
     def draft(self, phone, order):
         with Service(root=self.root) as service:
             current = self.quote(phone, order['lines'])
+            if (Decimal(current['total']) != Decimal(order['total']) or
+                    Decimal(current.get('shipping_charge', '0')) != Decimal(order.get('shipping_charge', '0'))):
+                raise ValueError('Delivery charge or total changed; obtain confirmation again.')
             if [(x['item_id'], x['quantity'], x['rate']) for x in current['lines']] != [(x['item_id'], x['quantity'], x['rate']) for x in order['lines']]:
                 raise ValueError('Catalog changed after customer confirmation; obtain confirmation again.')
             if current['customer_id'] != order['customer_id']:
@@ -120,6 +164,7 @@ class LiveBusiness:
             expected = [(l['item_id'], Decimal(l['quantity']), Decimal(l['rate'])) for l in order['lines']]
             from datetime import date
             if (actual != expected or Decimal(str(inv['total'])) != Decimal(order['total'])
+                or Decimal(str(inv.get('shipping_charge') or '0')) != Decimal(order.get('shipping_charge', '0'))
                 or inv.get('currency_code') != 'ZAR'
                 or date.fromisoformat(inv['due_date']) - date.fromisoformat(inv['date']) != timedelta(days=7)):
                 raise ValueError('Recovered invoice differs from the confirmed order. Resolve it manually; nothing will be sent.')
@@ -164,7 +209,13 @@ class LiveBusiness:
                     prior = {'source_invoice': invoice, 'lines': [
                         {'previous_line': line} for line in invoice.get('line_items', [])]}
                     test_fixture = True
+            try:
+                shipping, delivery = paid_delivery(prior)
+                delivery_total = str(shipping + sum((Decimal(x['quantity']) * Decimal(x['rate']) for x in delivery.values()), Decimal('0')))
+            except ValueError:
+                delivery_total = None
             return {'status': 'verified', 'test_fixture': test_fixture, 'date': prior['source_invoice']['date'],
+                    'paid_delivery_charge': delivery_total,
                     'lines': [{'item_id': str(row['previous_line'].get('item_id', '')),
                                'name': row['previous_line'].get('name', ''),
                                'quantity': row['previous_line'].get('quantity'),
@@ -210,12 +261,18 @@ class LiveBusiness:
         aliases = self.product_aliases(catalog)
         instructions = (
             'Draft a short customer reply for Roland to review, speaking for RG Midrand. '
-            'Do not run tools or promise actions. The current catalogue below is the only evidence of supplied products. '
+            'Do not run tools or claim completed actions. The current catalogue below is the only evidence of supplied products. '
             'Use the delivered conversation transcript to interpret short replies such as yes or no. '
             'If the customer says yes to the latest delivered product/quantity question, acknowledge that exact selection; '
             'do not ask the same product or quantity confirmation again. Current explicit conversation choices take '
             'precedence over historical purchases. A product selection is not approval of a priced order or invoice. '
             'After selection, simply acknowledge the requested product and quantity in natural customer-facing language. '
+            'When the customer has confirmed their product selection, use this exact wording: '
+            '"Sure, let me confirm stock and I will send through an invoice shortly." '
+            'This is an intention to check stock and prepare an invoice, not a claim that either action has happened. '
+            'If the verified previous invoice includes a positive paid_delivery_charge, add a sentence saying '
+            'the same delivery charge of R followed by that exact amount will be included. '
+            'Do not invent a delivery charge or say it is paid on the new order. '
             'Never mention owner review, Roland approval, internal checks, pending approval, or waiting for the owner to respond. '
             'These workflow details belong only in the private dashboard, not in customer replies. '
             'do not claim an order, invoice, delivery or payment is confirmed, created or sent. '

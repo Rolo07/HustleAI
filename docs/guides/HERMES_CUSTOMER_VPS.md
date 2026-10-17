@@ -242,3 +242,20 @@ Customer reply wording must keep internal approval, owner review and waiting
 states private. After product selection, acknowledge the product and requested
 quantity naturally. Do not claim fulfillment or invoice creation without the
 validated workflow. Approval and escalation details remain in the owner workspace.
+
+After a product selection is confirmed, the owner's chosen customer wording is:
+“Sure, let me confirm stock and I will send through an invoice shortly.” This
+states the intended next step; it does not claim stock was checked or an invoice
+was created/sent. A verified prior paid delivery amount can be mentioned too.
+
+Reorder quotes carry explicit delivery from the previous fully paid invoice:
+its shipping-charge field or an existing Delivery/Delivery 2 catalogue line.
+Shipping is shown separately in the order confirmation/owner summary and enters
+the Zoho payload and total. Delivery item lines keep their paid quantity/rate,
+are included once even after edits, and do not require merchandise stock.
+Product prices and stock are still checked against the current catalogue.
+Unpaid/discounted/invalid delivery, conflicting shipping-plus-delivery-line
+sources and renamed delivery items require clarification rather than guessing.
+Changes to delivery or total invalidate the previous confirmation before any
+invoice write. Ordinary draft creation and owner-approved delivery remain guarded
+by the existing workflow; this reply wording does not trigger invoice creation.
