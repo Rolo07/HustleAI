@@ -1,5 +1,8 @@
 # Documentation
 
+- [RG number release test plan](testing/RG_NUMBER_RELEASE_TEST_PLAN.md): end-to-end acceptance scenarios, failure cases and migration gates.
+- [Acceptance run template](testing/TEST_RUN_TEMPLATE.md): evidence, defects, retesting and owner sign-off.
+
 - [Owner dashboard](guides/OWNER_DASHBOARD.md): local preview, owner authentication, reorder versions, takeover and live integration setup.
 
 - [Repository structure](architecture/REPOSITORY.md): where code belongs and what is active versus planned.
