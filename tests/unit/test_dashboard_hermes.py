@@ -70,6 +70,8 @@ class GroundedCustomerReplyTests(unittest.TestCase):
             prompt = agent.call_args.args[0]['system_prompt']
             self.assertIn('["Chicken necks"]', prompt)
             self.assertIn('Do not invent products', prompt)
+            self.assertIn('Never mention owner review', prompt)
+            self.assertNotIn('say pricing and availability need owner review', prompt)
             self.assertIn('pack sizes only when explicitly present', prompt)
             self.assertIn('"date": "2026-10-01"', prompt)
             self.assertIn('"necks": "Chicken necks"', prompt)

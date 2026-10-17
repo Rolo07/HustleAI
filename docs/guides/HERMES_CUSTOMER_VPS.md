@@ -237,3 +237,8 @@ the delivered question: acknowledge the selected product and quantity rather
 than repeating the product confirmation. This does not bypass priced-order
 confirmation or owner approval, and does not create an invoice. Replies generated
 against a conversation that changes during generation are discarded.
+
+Customer reply wording must keep internal approval, owner review and waiting
+states private. After product selection, acknowledge the product and requested
+quantity naturally. Do not claim fulfillment or invoice creation without the
+validated workflow. Approval and escalation details remain in the owner workspace.
